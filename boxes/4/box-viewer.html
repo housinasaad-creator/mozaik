@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Zarf</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="1" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const KRAFT = "#f6f5f2";      // the envelope — white
+    const PAPER = "#e2dac7";      // the sheet inside — darker off-white so it reads against the envelope
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 2.2, 8.0);
+      camera.lookAt(0, 0.2, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.6));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* paper fiber grain — same recipe used across every box in this collection */
+      function paperGrain(x, w, h, strength) {
+        const s = strength || 1;
+        for (let i = 0; i < w * h / 550; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.10 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.08 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5 + Math.random() * 1.5);
+        }
+        x.lineWidth = 1.4;
+        for (let i = 0; i < w * h / 2800; i++) {
+          const fx = Math.random() * w, fy = Math.random() * h;
+          const len = 4 + Math.random() * 12;
+          const ang = (Math.random() - 0.5) * 0.5;
+          const light = Math.random() > 0.45;
+          x.strokeStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.09 * s) + ")"
+            : "rgba(90,80,60,"   + (Math.random() * 0.075 * s) + ")";
+          x.beginPath();
+          x.moveTo(fx, fy);
+          x.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+          x.stroke();
+        }
+        for (let i = 0; i < 34; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 30 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.045 * s) + ")" : "rgba(255,255,255," + (0.05 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 30;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        for (let i = 0; i < 260; i++) {
+          x.strokeStyle = "rgba(" + (Math.random() > 0.5 ? "200,200,200" : "60,60,60") + ",0.08)";
+          const fy = Math.random() * 512, fx = Math.random() * 512;
+          x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx + 4 + Math.random() * 10, fy + (Math.random() - 0.5) * 2); x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainSheet(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* logo panel: base color + the Mozaik logo pasted exactly as supplied
+         (never redrawn — centered on the panel) */
+      function logoPanelTexture(panelWpx, panelHpx, logoFrac, base) {
+        const c = document.createElement("canvas");
+        c.width = panelWpx; c.height = panelHpx;
+        const x = c.getContext("2d");
+        x.fillStyle = base || KRAFT;
+        x.fillRect(0, 0, panelWpx, panelHpx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(panelWpx * logoFrac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (panelWpx - lw) / 2, (panelHpx - lh) / 2, lw, lh);
+        }
+        paperGrain(x, panelWpx, panelHpx, 0.5);
+        return toTexture(c);
+      }
+
+      function normalizeUVs(geo) {
+        const uv = geo.attributes.uv;
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        for (let i = 0; i < uv.count; i++) {
+          minU = Math.min(minU, uv.getX(i)); maxU = Math.max(maxU, uv.getX(i));
+          minV = Math.min(minV, uv.getY(i)); maxV = Math.max(maxV, uv.getY(i));
+        }
+        const su = maxU - minU || 1, sv = maxV - minV || 1;
+        for (let i = 0; i < uv.count; i++) {
+          uv.setXY(i, (uv.getX(i) - minU) / su, (uv.getY(i) - minV) / sv);
+        }
+        uv.needsUpdate = true;
+        return geo;
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.85, bumpMap: bumpTex, bumpScale: 0.012, side: THREE.DoubleSide
+      });
+
+      /* =========================================================
+         GEOMETRY — a very THIN flat envelope (sleeve):
+           · front + back kraft panels, a bottom strip and two side
+             strips forming a slim pocket, open at the top
+           · a trapezoid closing flap hinged at the back's top edge,
+             authored in its CLOSED pose lying over the front
+           · a white sheet nested inside the pocket
+           · slider: the flap swings up & back, then the sheet
+             slides out of the mouth
+         ========================================================= */
+      const ENV_W = 2.3, ENV_H = 2.3, ENV_T = 0.006;   // panel thickness — truly paper-thin
+      const POCKET = 0.016;                             // inner front↔back gap — razor slim
+      const FLAP_H = 0.8;
+
+      const trayGroup = new THREE.Group();
+
+      const kraftTex = plainSheet(1024, 1024, KRAFT, 0.5);
+      const frontTex = logoPanelTexture(1024, 1024, 0.5);
+      const flapTex  = plainSheet(1024, 420, KRAFT, 0.5);
+
+      // back panel
+      const backPanel = new THREE.Mesh(new THREE.BoxGeometry(ENV_W, ENV_H, ENV_T), cardMat(kraftTex));
+      backPanel.position.set(0, ENV_H / 2, -POCKET / 2 - ENV_T / 2);
+      backPanel.castShadow = backPanel.receiveShadow = true;
+      trayGroup.add(backPanel);
+
+      // front panel — logo ONLY on the outward (+z) face
+      const plainK = () => cardMat(kraftTex);
+      const frontPanel = new THREE.Mesh(new THREE.BoxGeometry(ENV_W, ENV_H, ENV_T), [
+        plainK(), plainK(), plainK(), plainK(), cardMat(frontTex), plainK()
+      ]);
+      frontPanel.position.set(0, ENV_H / 2, POCKET / 2 + ENV_T / 2);
+      frontPanel.castShadow = frontPanel.receiveShadow = true;
+      trayGroup.add(frontPanel);
+
+      // bottom + side strips closing the pocket (top stays open — the mouth)
+      const bottomStrip = new THREE.Mesh(new THREE.BoxGeometry(ENV_W, ENV_T, POCKET), cardMat(kraftTex));
+      bottomStrip.position.set(0, ENV_T / 2, 0);
+      bottomStrip.castShadow = bottomStrip.receiveShadow = true;
+      trayGroup.add(bottomStrip);
+
+      const leftStrip = new THREE.Mesh(new THREE.BoxGeometry(ENV_T, ENV_H, POCKET), cardMat(kraftTex));
+      leftStrip.position.set(-ENV_W / 2 + ENV_T / 2, ENV_H / 2, 0);
+      leftStrip.castShadow = leftStrip.receiveShadow = true;
+      trayGroup.add(leftStrip);
+
+      const rightStrip = new THREE.Mesh(new THREE.BoxGeometry(ENV_T, ENV_H, POCKET), cardMat(kraftTex));
+      rightStrip.position.set(ENV_W / 2 - ENV_T / 2, ENV_H / 2, 0);
+      rightStrip.castShadow = rightStrip.receiveShadow = true;
+      trayGroup.add(rightStrip);
+
+      /* ---------- closing flap: hinged at the back panel's top edge,
+         authored in CLOSED pose (hanging down over the front face) ---------- */
+      function flapGeometry() {
+        const cr = 0.16;
+        const shape = new THREE.Shape();
+        shape.moveTo(-ENV_W / 2, 0);
+        shape.lineTo(ENV_W / 2, 0);
+        shape.lineTo(ENV_W / 2, -(FLAP_H - cr));
+        shape.quadraticCurveTo(ENV_W / 2, -FLAP_H, ENV_W / 2 - cr, -FLAP_H);
+        shape.lineTo(-ENV_W / 2 + cr, -FLAP_H);
+        shape.quadraticCurveTo(-ENV_W / 2, -FLAP_H, -ENV_W / 2, -(FLAP_H - cr));
+        shape.closePath();
+        return normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: ENV_T, bevelEnabled: false, curveSegments: 20 }));
+      }
+
+      const flapPivot = new THREE.Group();
+      flapPivot.position.set(0, ENV_H, 0);
+      trayGroup.add(flapPivot);
+
+      const flap = new THREE.Mesh(flapGeometry(), cardMat(flapTex));
+      flap.position.z = POCKET / 2 + ENV_T + 0.004;   // lying just outside the front face
+      flap.castShadow = flap.receiveShadow = true;
+      flapPivot.add(flap);
+
+      /* ---------- the sheet inside: darker off-white, same logo centered ---------- */
+      const paperTex = logoPanelTexture(900, 900, 0.5, PAPER);
+      const plainP = () => cardMat(plainSheet(256, 256, PAPER, 0.35));
+      const paper = new THREE.Mesh(new THREE.BoxGeometry(ENV_W - 0.22, ENV_H - 0.16, 0.004), [
+        plainP(), plainP(), plainP(), plainP(), cardMat(paperTex), cardMat(paperTex)
+      ]);
+      const PAPER_IN_Y = (ENV_H - 0.16) / 2 + 0.05;   // nested inside the pocket
+      const PAPER_LIFT = 1.55;                         // how far it slides out
+      paper.position.set(0, PAPER_IN_Y, 0);
+      paper.castShadow = paper.receiveShadow = true;
+      trayGroup.add(paper);
+
+      scene.add(trayGroup);
+      trayGroup.position.y = -1.15;
+
+      const boxGroup = new THREE.Group();
+      boxGroup.add(trayGroup);
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.30 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -1.15 - 0.001;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 1 = closed, 0 = flap open + sheet out ----------
+         staggered: the flap swings first, then the sheet slides out */
+      let foldTarget = 1, fold = 1;
+      function applyFold(t) {
+        const open = 1 - t;
+        const flapT = Math.min(1, open * 1.7);
+        const paperT = Math.max(0, (open - 0.4) / 0.6);
+        flapPivot.rotation.x = -Math.PI * flapT;       // exactly 180° — flips fully open
+        paper.position.y = PAPER_IN_Y + PAPER_LIFT * paperT;
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.22, y: Math.PI / 9 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const d = camera.position.length();
+        if (d < 4.5) camera.position.setLength(4.5);
+        if (d > 16)  camera.position.setLength(16);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const d = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - d) * 0.004);
+          pinchDist = d;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, trayGroup, flapPivot, flap, paper, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ envelope ready");
+    }
+  </script>
+</body>
+</html>

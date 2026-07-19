@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Teleskopik Ayakkabı Kutusu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const WHITE = "#f6f5f2";        // white lid
+    const NAVY  = "#2a3670";        // deep navy base (matches the reference shoe box)
+    const KRAFT = "#b17d4b";        // warm kraft brown for the INSIDE of the corrugated board
+
+    /* load the colored horizontal logo (for the WHITE lid), the white logo
+       (for the NAVY base) and the mosaic M-mark, then init */
+    let logo = null, logoW = null, mark = null, loaded = 0;
+    function ready() { if (++loaded === 3) init(); }
+    const logoImg = new Image();
+    logoImg.onload  = () => { logo = logoImg; ready(); };
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); ready(); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+    const logoWImg = new Image();
+    logoWImg.onload  = () => { logoW = logoWImg; ready(); };
+    logoWImg.onerror = () => { console.warn("mozaik-logo-white.png not found"); ready(); };
+    logoWImg.src = "assets/mozaik-logo-white.png";
+    const markImg = new Image();
+    markImg.onload  = () => { mark = markImg; ready(); };
+    markImg.onerror = () => { console.warn("logo-mark.png not found"); ready(); };
+    markImg.src = "assets/logo-mark.png";
+
+    function init() {
+      console.log("init, logo:", logo ? "ok" : "none", "logoW:", logoW ? "ok" : "none", "mark:", mark ? "ok" : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 4.0, 12.5);
+      camera.lookAt(0, 0.1, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.64));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      function paperGrain(x, w, h, strength) {
+        const s = (strength == null ? 1 : strength) * 0.5;
+        for (let i = 0; i < w * h / 900; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.07 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.05 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.4 + Math.random() * 1.4, 1.4 + Math.random() * 1.4);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 18;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainPanel(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* colored panel + a centered image (no rotation).
+         bg = background colour, cx/cy = fractional centre, frac = width fraction */
+      function imgPanel(img, wPx, hPx, frac, bg, cx, cy) {
+        cx = (cx == null ? 0.5 : cx); cy = (cy == null ? 0.5 : cy);
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = bg || WHITE;
+        x.fillRect(0, 0, wPx, hPx);
+        if (img) {
+          const ratio = img.naturalHeight / img.naturalWidth;
+          const lw = Math.round(wPx * frac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(img, Math.round(wPx * cx - lw / 2), Math.round(hPx * cy - lh / 2), lw, lh);
+        }
+        paperGrain(x, wPx, hPx, bg && bg !== WHITE ? 0.5 : 0.4);
+        return toTexture(c);
+      }
+
+      /* colored panel + faint centred text line (subtle side print) */
+      function textPanel(wPx, hPx, bg, txt, col) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = bg;
+        x.fillRect(0, 0, wPx, hPx);
+        x.fillStyle = col;
+        x.textAlign = "center";
+        x.textBaseline = "middle";
+        x.font = "600 " + Math.round(hPx * 0.16) + "px 'Segoe UI', Arial, sans-serif";
+        x.globalAlpha = 0.85;
+        x.translate(wPx / 2, hPx / 2);
+        for (let i = 0; i < txt.length; i++) {
+          x.fillText(txt[i], 0, (i - (txt.length - 1) / 2) * hPx * 0.19);
+        }
+        x.globalAlpha = 1;
+        paperGrain(x, wPx, hPx, bg !== WHITE ? 0.5 : 0.4);
+        return toTexture(c);
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.86, bumpMap: bumpTex, bumpScale: 0.011, side: THREE.DoubleSide
+      });
+
+      const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
+      const navyTex  = plainPanel(1024, 1024, NAVY, 0.5);
+      const kraftTex = plainPanel(1024, 1024, KRAFT, 0.55);
+      const wMat = () => cardMat(whiteTex);          // white outer (lid)
+      const nMat = () => cardMat(navyTex);           // navy outer (base)
+      const kMat = () => cardMat(kraftTex);          // kraft brown inner
+
+      /* =========================================================
+         GEOMETRY — TELESCOPIC (two-piece) shoe box: a deep NAVY
+         base tray (open top) + a shallow WHITE lid that slides down
+         OVER it. Every panel is a REAL 3-LAYER corrugated board —
+         a thin printed outer liner (navy or white), a thin KRAFT
+         inner liner, and a genuine wavy fluting sheet between them
+         (real geometry, seen on every cut edge). Same board build,
+         thickness and flute as box #10.
+         ========================================================= */
+      const BW = 3.4, BH = 1.15, BD = 2.0;   // base: width(x), height(y), depth(z) — long shoe box
+      const tL  = 0.004;                     // liner thickness (very thin, per side)
+      const gap = 0.024;                     // flute gap between the two liners
+      const TC  = 2 * tL + gap;              // total board thickness (~0.032 — very thin)
+      const amp = gap * 0.5 * 0.92;          // flute wave amplitude (deep, nearly liner-to-liner)
+      const per = 0.055;                     // flute pitch (tight waves = real corrugation feel)
+
+      /* faces order for BoxGeometry mats: [+x, -x, +y, -y, +z, -z] */
+      function boxMesh(w, h, d, mats) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      const kraftEdgeTex = plainPanel(1024, 256, KRAFT, 0.55);   // flute sheet colour
+      const SHOW_FLUTE = true;
+
+      /* a flat corrugated board in the local XY plane, thickness along +z,
+         OUTER (printed) face toward +z, INNER (kraft) toward -z.
+         skinMat = the solid colour of the outer liner (white for lid, navy for base):
+         it paints the outer liner's thin edges so folded corners read that colour. */
+      function corrugatedBoard(w, h, faceMat, skinMat) {
+        const g = new THREE.Group();
+        const skin = skinMat || wMat;
+
+        // OUTER liner — printed face (+z); thin edges = skin colour.
+        const outer = boxMesh(w, h, tL, [skin(), skin(), skin(), skin(), faceMat, skin()]);
+        outer.position.z = TC / 2 - tL / 2;
+        g.add(outer);
+
+        // INNER liner — WHITE interior surface (-z, faces into the box) so the
+        // inside of the box reads pure white. Every cut EDGE and the hidden (+z)
+        // face = skin colour, so no brown/kraft shows anywhere.
+        const inner = boxMesh(w, h, tL, [skin(), skin(), skin(), skin(), skin(), wMat()]);
+        inner.position.z = -(TC / 2 - tL / 2);
+        g.add(inner);
+
+        // FLUTE — real wavy kraft sheet between the liners (mimics corrugation).
+        if (SHOW_FLUTE) {
+          const mrgX = TC * 4, mrgY = TC * 4;
+          const x0 = -w / 2 + mrgX, x1 = w / 2 - mrgX, y0 = -h / 2 + mrgY, y1 = h / 2 - mrgY;
+          const N = Math.max(8, Math.round((x1 - x0) / per * 2));
+          const pos = [], idx = [];
+          for (let i = 0; i <= N; i++) {
+            const x = x0 + (x1 - x0) * i / N;
+            const z = amp * Math.sin((x - x0) / per * Math.PI * 2);
+            pos.push(x, y0, z,  x, y1, z);
+          }
+          for (let i = 0; i < N; i++) {
+            const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
+            idx.push(a, c, b,  b, c, d);
+          }
+          const fg = new THREE.BufferGeometry();
+          fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+          fg.setIndex(idx);
+          fg.computeVertexNormals();
+          const fl = new THREE.Mesh(fg, cardMat(whiteTex));   // white flute → interior stays fully white
+          fl.castShadow = fl.receiveShadow = true;
+          g.add(fl);
+        }
+        return g;
+      }
+
+      /* a SOLID single-sheet board (no corrugation gap) — same face layout as
+         corrugatedBoard (+z = printed face, other faces = skin) but one solid slab
+         of thickness TC, so its cut edges/rim are flush with NO opening. Used for the
+         lid top so the top-face perimeter shows no gap. */
+      function solidBoard(w, h, faceMat, skinMat) {
+        const skin = skinMat || wMat;
+        return boxMesh(w, h, TC, [skin(), skin(), skin(), skin(), faceMat, skin()]);
+      }
+
+      const boxGroup = new THREE.Group();
+
+      /* ---------- printed textures ---------- */
+      // lid TOP — colored logo on white
+      const lidTopTex   = imgPanel(logo, 1440, 840, 0.60, WHITE, 0.5, 0.5);
+      // lid SIDE logo decal — colored logo on a TRANSPARENT strip (sits on the white
+      // skirt), drawn as a billboard so it reads correctly on all four sides.
+      const logoRatio = logo ? logo.naturalHeight / logo.naturalWidth : 0.36;
+      const lidLogoDecalTex = (function () {
+        const wPx = 1024, hPx = Math.max(1, Math.round(1024 * logoRatio));
+        const c = document.createElement("canvas"); c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        if (logo) x.drawImage(logo, 0, 0, wPx, hPx);
+        return toTexture(c);
+      })();
+      // base long faces — white logo on navy, sitting LOW so it shows below the lid skirt
+      const baseFrontTex = imgPanel(logoW, 1480, 520, 0.52, NAVY, 0.5, 0.66);
+      const baseBackTex  = imgPanel(logoW, 1480, 520, 0.52, NAVY, 0.5, 0.66);
+      // base short faces — mosaic M mark on navy, sitting low
+      const baseSideTexL = imgPanel(mark, 900, 560, 0.24, NAVY, 0.5, 0.70);
+      const baseSideTexR = imgPanel(mark, 900, 560, 0.24, NAVY, 0.5, 0.70);
+
+      /* =========================================================
+         BASE — navy tray: 4 walls (navy outer, kraft inner) + a
+         closed bottom, OPEN top. All exterior edges read navy.
+         ========================================================= */
+      const base = new THREE.Group();
+      boxGroup.add(base);
+
+      (function () { const b = corrugatedBoard(BW, BH, cardMat(baseFrontTex), nMat); b.position.set(0, 0, BD / 2 - TC / 2); base.add(b); })();                        // front (+z)
+      (function () { const b = corrugatedBoard(BW, BH, cardMat(baseBackTex),  nMat); b.rotation.y = Math.PI;      b.position.set(0, 0, -BD / 2 + TC / 2); base.add(b); })(); // back (-z)
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(baseSideTexR), nMat); b.rotation.y =  Math.PI / 2; b.position.set(BW / 2 - TC / 2, 0, 0); base.add(b); })(); // right (+x)
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(baseSideTexL), nMat); b.rotation.y = -Math.PI / 2; b.position.set(-BW / 2 + TC / 2, 0, 0); base.add(b); })(); // left (-x)
+
+      // NAVY corner posts — fill the TC×TC vertical corner column to hide the seam
+      // between adjacent base panels (same idea as the lid). Outer faces = navy so
+      // the exterior corner reads clean navy; TOP (+y) & bottom (-y) = navy so the rim
+      // corner reads navy from above (not white); inner faces = white to keep the
+      // interior white. FLUSH: no protrusion inward or outward.
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (s) {
+        const m = [wMat(), wMat(), nMat(), nMat(), wMat(), wMat()];   // default white; +y top & -y bottom navy
+        m[s[0] > 0 ? 0 : 1] = nMat();   // outer X face → navy
+        m[s[1] > 0 ? 4 : 5] = nMat();   // outer Z face → navy
+        const p = new THREE.Mesh(new THREE.BoxGeometry(TC, BH, TC), m);
+        p.castShadow = p.receiveShadow = true;
+        p.position.set(s[0] * (BW / 2 - TC / 2), 0, s[1] * (BD / 2 - TC / 2));
+        base.add(p);
+      });
+
+      // closed bottom — SOLID floor at the FULL footprint (BW×BD) so it caps the whole
+      // underside: the walls' bottom corrugation edge (which showed as a gap ring around
+      // the base perimeter) is now covered by the solid navy floor. Dropped a hair below
+      // the walls so it wins from below. After rotation.x=+PI/2: local +z→down(outer),
+      // local -z→up(interior). Outer bottom + perimeter edges = navy; interior top = white.
+      (function () {
+        const m = [nMat(), nMat(), nMat(), nMat(), nMat(), wMat()]; // edges+bottom navy; -z(idx5)=white interior floor
+        const b = boxMesh(BW, BD, TC, m);
+        b.rotation.x = Math.PI / 2;
+        b.position.set(0, -BH / 2 + TC / 2 - 0.002, 0);   // 0.002 below → caps the wall bottoms, no gap
+        base.add(b);
+      })();
+
+      /* =========================================================
+         LID — shallow white cap that telescopes DOWN over the base:
+         a printed top panel + a short skirt, slightly larger so it
+         sits OUTSIDE the base walls. Lifted/lowered by the slider.
+         ========================================================= */
+      const lid = new THREE.Group();
+      boxGroup.add(lid);
+
+      const clr   = 0.012;                       // clearance between lid skirt and base wall
+      const LID_H = 0.5;                          // skirt height (how far the lid comes down)
+      const LW = BW + 2 * TC + 2 * clr;          // lid outer width
+      const LD = BD + 2 * TC + 2 * clr;          // lid outer depth
+
+      // TOP panel — SOLID board (corrugation removed here) so the top-face perimeter
+      // is flush with NO gap/opening at the edges. White outer UP, colored logo on top.
+      (function () {
+        const b = solidBoard(LW, LD, cardMat(lidTopTex), wMat);
+        b.rotation.x = -Math.PI / 2;             // outer (+z) → +y (up)
+        b.position.y = TC / 2;                   // outer (white) face sits at lid local top
+        lid.add(b);
+      })();
+
+      // SKIRT — 4 short white walls hanging down from the top panel
+      (function () {
+        const yc = -LID_H / 2 + TC / 2;          // skirt centred just under the top panel
+        const bF = corrugatedBoard(LW, LID_H, wMat(), wMat); bF.position.set(0, yc,  LD / 2 - TC / 2); lid.add(bF);                     // front (+z)
+        const bB = corrugatedBoard(LW, LID_H, wMat(), wMat); bB.rotation.y = Math.PI;      bB.position.set(0, yc, -LD / 2 + TC / 2); lid.add(bB); // back (-z)
+        const bR = corrugatedBoard(LD - 2 * TC, LID_H, wMat(), wMat); bR.rotation.y =  Math.PI / 2; bR.position.set(LW / 2 - TC / 2, yc, 0); lid.add(bR); // right (+x)
+        const bL = corrugatedBoard(LD - 2 * TC, LID_H, wMat(), wMat); bL.rotation.y = -Math.PI / 2; bL.position.set(-LW / 2 + TC / 2, yc, 0); lid.add(bL); // left (-x)
+
+        // LOGO decals on the FOUR small side faces — thin billboards just outside each
+        // skirt face; a plane rotated to face outward shows the logo un-mirrored on
+        // every side. Transparent background → only the logo ink sits on the white.
+        const LOGOW = 0.92, LOGOH = LOGOW * logoRatio, eps = 0.003;
+        function sideLogo(rotY, pos) {
+          const m = new THREE.Mesh(
+            new THREE.PlaneGeometry(LOGOW, LOGOH),
+            new THREE.MeshStandardMaterial({ map: lidLogoDecalTex, transparent: true, alphaTest: 0.5, roughness: 0.9, metalness: 0.0 })
+          );
+          m.rotation.y = rotY; m.position.set(pos[0], yc, pos[2]);
+          lid.add(m);
+        }
+        sideLogo(0,            [0, 0,  LD / 2 + eps]);   // front (+z)
+        sideLogo(Math.PI,      [0, 0, -LD / 2 - eps]);   // back (-z)
+        sideLogo(Math.PI / 2,  [ LW / 2 + eps, 0, 0]);   // right (+x)
+        sideLogo(-Math.PI / 2, [-LW / 2 - eps, 0, 0]);   // left (-x)
+
+        // WHITE corner posts — fill the TC×TC vertical corner column to hide the
+        // seam between adjacent skirt panels. FLUSH: outer faces land exactly on the
+        // lid's outer planes (±LW/2, ±LD/2) and inner faces on the walls' inner
+        // planes → the post sticks out NEITHER inward NOR outward. All-white, so it
+        // blends seamlessly with the white lid.
+        [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (s) {
+          const p = new THREE.Mesh(new THREE.BoxGeometry(TC, LID_H, TC),
+            [wMat(), wMat(), wMat(), wMat(), wMat(), wMat()]);
+          p.castShadow = p.receiveShadow = true;
+          p.position.set(s[0] * (LW / 2 - TC / 2), yc, s[1] * (LD / 2 - TC / 2));
+          lid.add(p);
+        });
+      })();
+
+      // closed position: lid top just above the base rim; skirt overlaps the upper base
+      const LID_CLOSED_Y = BH / 2 + clr;
+      lid.position.y = LID_CLOSED_Y;
+
+      scene.add(boxGroup);
+      boxGroup.position.y = 0.15;
+
+      /* ---------- soft ground shadow ---------- */
+      const groundY = -BH / 2 + 0.15 - 0.001;
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.28 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = groundY;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- lid state: 0 = CLOSED (seated), 1 = OPEN (lifted & offset) ---------- */
+      const LIFT_MAX = 1.7;                        // how high the lid rises when fully open
+      const SLIDE_MAX = 0.35;                       // slight sideways slide for a natural "ajar" look
+      let liftTarget = 0, lift = 0;
+      function applyLift(t) {
+        lid.position.y = LID_CLOSED_Y + t * LIFT_MAX;
+        lid.position.x = t * SLIDE_MAX;
+        lid.position.z = t * SLIDE_MAX * 0.5;
+      }
+      applyLift(lift);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { liftTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.28, y: Math.PI / 6 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const dd = camera.position.length();
+        if (dd < 6) camera.position.setLength(6);
+        if (dd > 24) camera.position.setLength(24);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const dd = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - dd) * 0.004);
+          pinchDist = dd;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(liftTarget - lift) > 0.0005) {
+          lift += (liftTarget - lift) * 0.09;
+          applyLift(lift);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, base, lid, camera, scene,
+        setLift: (t) => { liftTarget = t; lift = t; applyLift(t); } };
+
+      console.log("✓ Teleskopik shoe box ready");
+    }
+  </script>
+</body>
+</html>

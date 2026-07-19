@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Sürgülü Kutu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette (Spot UV box: graphite sleeve + emerald drawer) ---------- */
+    const WHITE = "#2b2f33";     // matte graphite sleeve — darker (was #3f4448)
+    const BLUE  = "#0b6242";     // emerald-green inner drawer — one shade deeper (was #10794f)
+    const LOGOTINT = "#848c93";  // glossy tonal grey for the sleeve mark — reads as spot-UV varnish
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* recolor the Mozaik mark to a single tonal grey — a glossy spot-UV
+         varnish over the matte graphite sleeve (the box's namesake finish) */
+      let logoTinted = null;
+      if (logo && logo.naturalWidth) {
+        const gc = document.createElement("canvas");
+        gc.width = logo.naturalWidth; gc.height = logo.naturalHeight;
+        const gx = gc.getContext("2d");
+        gx.drawImage(logo, 0, 0);
+        gx.globalCompositeOperation = "source-in"; // keep alpha, recolor
+        gx.fillStyle = LOGOTINT;
+        gx.fillRect(0, 0, gc.width, gc.height);
+        gc.naturalWidth = gc.width; gc.naturalHeight = gc.height;
+        logoTinted = gc;
+      }
+      const logoArt = logoTinted || logo;
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      /* subtle studio ENVIRONMENT — a dark field with one bright softbox band, so
+         the spot-UV varnish (low-roughness logo areas) catches a real, moving
+         highlight while the matte board stays flat */
+      (function () {
+        const ec = document.createElement("canvas"); ec.width = 512; ec.height = 256;
+        const ex = ec.getContext("2d");
+        // dark field with a WIDE bright softbox stripe across the upper hemisphere,
+        // so a glossy face catches a strong highlight at almost any rotation
+        const g = ex.createLinearGradient(0, 0, 0, 256);
+        g.addColorStop(0.00, "#0a0a0c");
+        g.addColorStop(0.16, "#3a3d42");
+        g.addColorStop(0.24, "#ffffff");   // bright softbox band (ring) → the reflected highlight
+        g.addColorStop(0.34, "#ffffff");
+        g.addColorStop(0.46, "#8a9099");   // upper-mid glow → keeps the side logos lit too
+        g.addColorStop(0.60, "#141518");
+        g.addColorStop(1.00, "#000000");
+        ex.fillStyle = g; ex.fillRect(0, 0, 512, 256);
+        // a couple of soft hot spots so the highlight has life as it sweeps
+        [160, 360].forEach((cx) => {
+          const gb = ex.createRadialGradient(cx, 74, 6, cx, 74, 120);
+          gb.addColorStop(0, "rgba(255,255,255,1)"); gb.addColorStop(1, "rgba(255,255,255,0)");
+          ex.fillStyle = gb; ex.fillRect(0, 0, 512, 256);
+        });
+        const et = new THREE.CanvasTexture(ec);
+        et.mapping = THREE.EquirectangularReflectionMapping;
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        scene.environment = pmrem.fromEquirectangular(et).texture;
+        et.dispose(); pmrem.dispose();
+      })();
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 3.4, 9.6);
+      camera.lookAt(0, 0.1, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.62));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* SOFT paper grain */
+      function paperGrain(x, w, h, strength) {
+        const s = (strength == null ? 1 : strength) * 0.5;
+        for (let i = 0; i < w * h / 900; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.07 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.05 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.4 + Math.random() * 1.4, 1.4 + Math.random() * 1.4);
+        }
+        for (let i = 0; i < 22; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 40 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.03 * s) + ")" : "rgba(255,255,255," + (0.035 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 18;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainPanel(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* sleeve-top maps: matte graphite base + the Mozaik mark (rotated to a
+         PORTRAIT lockup, pulled IN from the edges) rendered as a SPOT-UV panel —
+         GLOSSY (low roughness) and very, very slightly RAISED (a tiny bump) over
+         the surrounding matte board. Returns { map, rough, bump }. */
+      function makeSpotUVMaps(wPx, hPx, frac, rot, baseCol) {
+        rot = rot || 0;
+        baseCol = baseCol || WHITE;               // board colour (graphite by default, green for the drawer)
+        const portrait = Math.abs(rot) > 0.01;   // portrait lockup → size off the height
+        const base = document.createElement("canvas"); base.width = wPx; base.height = hPx;
+        const bx = base.getContext("2d");
+        bx.fillStyle = baseCol; bx.fillRect(0, 0, wPx, hPx);
+
+        // roughness: light-grey (matte board) everywhere, dark (glossy) on the mark
+        const rgh = document.createElement("canvas"); rgh.width = wPx; rgh.height = hPx;
+        const rx = rgh.getContext("2d");
+        rx.fillStyle = "#f6f6f6"; rx.fillRect(0, 0, wPx, hPx);      // ~0.96 → board effectively matte (no reflection)
+
+        // bump: neutral grey (flat) everywhere, faintly brighter (raised) on the mark
+        const bmp = document.createElement("canvas"); bmp.width = wPx; bmp.height = hPx;
+        const mpx = bmp.getContext("2d");
+        mpx.fillStyle = "#808080"; mpx.fillRect(0, 0, wPx, hPx);
+
+        // metalness: black (dielectric board) everywhere, grey (reflective) ONLY on the mark
+        const met = document.createElement("canvas"); met.width = wPx; met.height = hPx;
+        const mtx = met.getContext("2d");
+        mtx.fillStyle = "#000000"; mtx.fillRect(0, 0, wPx, hPx);
+
+        // displacement: black (board flat) → white (mark physically RAISED) with a soft bevel
+        const dsp = document.createElement("canvas"); dsp.width = wPx; dsp.height = hPx;
+        const dpx = dsp.getContext("2d");
+        dpx.fillStyle = "#000000"; dpx.fillRect(0, 0, wPx, hPx);
+
+        if (logoArt) {
+          const ratio = logoArt.naturalHeight / logoArt.naturalWidth;
+          const lw = Math.round((portrait ? hPx : wPx) * frac);
+          const lh = Math.round(lw * ratio);
+          // a solid-colour silhouette of the mark, using the logo's own alpha
+          const stencil = (col) => {
+            const s = document.createElement("canvas");
+            s.width = logoArt.naturalWidth; s.height = logoArt.naturalHeight;
+            const sx = s.getContext("2d");
+            sx.drawImage(logoArt, 0, 0);
+            sx.globalCompositeOperation = "source-in";
+            sx.fillStyle = col; sx.fillRect(0, 0, s.width, s.height);
+            return s;
+          };
+          const place = (ctx, img) => {
+            ctx.save(); ctx.translate(wPx / 2, hPx / 2); ctx.rotate(rot);
+            ctx.drawImage(img, -lw / 2, -lh / 2, lw, lh); ctx.restore();
+          };
+          place(bx, logoArt);             // colour → the tonal-grey mark
+          place(rx, stencil("#161619"));  // gloss  → very smooth (~0.08) → sharp reflection
+          // emboss → a white plateau with soft (blurred) bevel edges: the mark reads
+          // as clearly RAISED, and the sloped edges catch the light
+          mpx.save(); mpx.filter = "blur(3px)"; place(mpx, stencil("#ffffff")); mpx.restore();
+          place(mtx, stencil("#787878")); // metal  → ~0.47 reflective, ONLY on the mark
+          // displacement height field — soft bevel so the raised edges slope, not cliff
+          dpx.save(); dpx.filter = "blur(2px)"; place(dpx, stencil("#ffffff")); dpx.restore();
+        }
+        paperGrain(bx, wPx, hPx, 0.4);
+        return { map: toTexture(base), rough: toTexture(rgh), bump: toTexture(bmp),
+                 metal: toTexture(met), disp: toTexture(dsp) };
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.84, bumpMap: bumpTex, bumpScale: 0.01,
+        envMapIntensity: 0.0, side: THREE.DoubleSide   // flats stay fully matte — no reflection
+      });
+
+      /* =========================================================
+         GEOMETRY — SLIDING DRAWER BOX ("kayar / sürgülü kutu"):
+           · an OUTER SLEEVE — a white tube (top/bottom/left/right
+             panels, open on both ends) with the vertical Mozaik
+             logo printed on the top face
+           · an INNER DRAWER — a blue open-top tray (floor + 4 low
+             walls) that slides in and out of the sleeve
+           · real board THICKNESS (T) on every panel, like box 6
+           · slider = the drawer sliding OUT (open) ⇄ IN (closed)
+         ========================================================= */
+      const ST  = 0.015;                // SLEEVE board thickness (very thin white shell)
+      const DT  = 0.22;                 // DRAWER board thickness (thick visible rim ~3× — chunky border like the real product)
+      const SW  = 1.95, SH = 0.567, SL = 3.0;  // sleeve outer: width(x), height(y), length(z) — height reduced by 1/3
+      const CLR = 0.02;                 // side clearance between drawer and sleeve interior
+      const HGAP = 0.006;               // tiny top gap so the drawer just clears the sleeve roof
+
+      // drawer outer dimensions — the drawer fills the sleeve interior almost
+      // completely in HEIGHT so no black gap shows under the sleeve top
+      const DW  = SW - 2 * ST - 2 * CLR;
+      const DH  = SH - 2 * ST - HGAP;
+      const DL  = SL - 2 * ST;
+
+      const whiteTex   = plainPanel(1024, 1024, WHITE, 0.5);
+      const blueTex    = plainPanel(1024, 1024, BLUE, 0.32);
+      const topMaps   = makeSpotUVMaps(560, 860, 0.5, -Math.PI / 2);   // portrait mark on the top, pulled in from the edges
+      const sideMaps  = makeSpotUVMaps(1120, 200, 0.28, 0);            // landscape mark on the long side walls
+      const frontMaps = makeSpotUVMaps(1120, 316, 0.30, 0, BLUE);      // landscape mark on the GREEN drawer front
+
+      const wMat = () => cardMat(whiteTex);
+      const bMat = () => cardMat(blueTex);
+
+      /* faces order for BoxGeometry mats: [+x, -x, +y, -y, +z, -z] */
+      function boxMesh(w, h, d, mats) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      const boxGroup = new THREE.Group();
+
+      /* ---------- OUTER SLEEVE (white tube, open on ±z ends) ---------- */
+      const sleeve = new THREE.Group();
+      boxGroup.add(sleeve);
+
+      // spot-UV material: glossy (roughnessMap) + a hair of relief (bumpMap),
+      // reflecting the studio environment so the varnish visibly shines
+      const spotMat = (maps) => new THREE.MeshStandardMaterial({
+        map: maps.map, roughnessMap: maps.rough, bumpMap: maps.bump, metalnessMap: maps.metal,
+        displacementMap: maps.disp, displacementScale: 0.018, displacementBias: 0,  // REAL raised relief (subtle)
+        metalness: 1.0, roughness: 1.0, bumpScale: 0.03,    // bump adds fine grain on top of the relief
+        envMapIntensity: 2.4, side: THREE.DoubleSide
+      });
+
+      // top panel — graphite + portrait spot-UV mark on the OUTER (+y) face.
+      // SUBDIVIDED (x,z segments) so the displacementMap can physically raise the mark.
+      const topMats = [wMat(), wMat(), spotMat(topMaps), wMat(), wMat(), wMat()];
+      const topPanel = new THREE.Mesh(new THREE.BoxGeometry(SW, ST, SL, 220, 1, 340), topMats);
+      topPanel.castShadow = topPanel.receiveShadow = true;
+      topPanel.position.set(0, SH / 2 - ST / 2, 0);
+      sleeve.add(topPanel);
+
+      // bottom panel — white
+      const botPanel = boxMesh(SW, ST, SL, [wMat(), wMat(), wMat(), wMat(), wMat(), wMat()]);
+      botPanel.position.set(0, -SH / 2 + ST / 2, 0);
+      sleeve.add(botPanel);
+
+      // left + right panels — white (height spans between top & bottom panels)
+      const sideH = SH - 2 * ST;
+      // outer face of the left wall = -x (index 1); right wall = +x (index 0) → side logo there.
+      // SUBDIVIDED (y,z segments) so the side marks also raise via displacement.
+      const leftPanel = new THREE.Mesh(new THREE.BoxGeometry(ST, sideH, SL, 1, 90, 340),
+        [wMat(), spotMat(sideMaps), wMat(), wMat(), wMat(), wMat()]);
+      leftPanel.castShadow = leftPanel.receiveShadow = true;
+      leftPanel.position.set(-SW / 2 + ST / 2, 0, 0);
+      sleeve.add(leftPanel);
+
+      const rightPanel = new THREE.Mesh(new THREE.BoxGeometry(ST, sideH, SL, 1, 90, 340),
+        [spotMat(sideMaps), wMat(), wMat(), wMat(), wMat(), wMat()]);
+      rightPanel.castShadow = rightPanel.receiveShadow = true;
+      rightPanel.position.set(SW / 2 - ST / 2, 0, 0);
+      sleeve.add(rightPanel);
+
+      /* ---------- INNER DRAWER (blue open-top tray) ----------
+         built with its floor bottom at local y = 0, then seated on the
+         sleeve interior floor via drawer.position.y */
+      const drawer = new THREE.Group();
+      boxGroup.add(drawer);
+
+      // floor — THIN (same thin board as the white sleeve), only the walls stay thick
+      const dFloor = boxMesh(DW, ST, DL, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dFloor.position.set(0, ST / 2, 0);
+      drawer.add(dFloor);
+
+      // front (+z) & back (-z) walls — the front is the visible "push" face.
+      // SUBDIVIDED so the raised spot-UV mark can displace on the +z outer face (index 4).
+      const dFront = new THREE.Mesh(new THREE.BoxGeometry(DW, DH, DT, 300, 90, 1),
+        [bMat(), bMat(), bMat(), bMat(), spotMat(frontMaps), bMat()]);
+      dFront.castShadow = dFront.receiveShadow = true;
+      dFront.position.set(0, DH / 2, DL / 2 - DT / 2);
+      drawer.add(dFront);
+
+      const dBack = boxMesh(DW, DH, DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dBack.position.set(0, DH / 2, -DL / 2 + DT / 2);
+      drawer.add(dBack);
+
+      // left (-x) & right (+x) walls
+      const dLeft = boxMesh(DT, DH, DL - 2 * DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dLeft.position.set(-DW / 2 + DT / 2, DH / 2, 0);
+      drawer.add(dLeft);
+
+      const dRight = boxMesh(DT, DH, DL - 2 * DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dRight.position.set(DW / 2 - DT / 2, DH / 2, 0);
+      drawer.add(dRight);
+
+      /* ---------- inner 3×3 divider grid → 9 compartments (like the reference) ---------- */
+      {
+        const gx = DW / 2 - DT, gz = DL / 2 - DT;   // inner clear half-extents
+        const divT = 0.025;                         // thin divider board (smaller pieces)
+        const divH = DH * 0.62;                      // lower dividers — sit well below the rim
+        const yC = divH / 2;
+        const eps = 0.01;                            // pull ends off the walls (no z-fight)
+        // two dividers running along Z → split the WIDTH into 3 columns
+        [-gx / 3, gx / 3].forEach((xC) => {
+          const d = boxMesh(divT, divH, 2 * gz - eps, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+          d.position.set(xC, yC, 0);
+          drawer.add(d);
+        });
+        // two dividers running along X → split the LENGTH into 3 rows
+        [-gz / 3, gz / 3].forEach((zC) => {
+          const d = boxMesh(2 * gx - eps, divH, divT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+          d.position.set(0, yC, zC);
+          drawer.add(d);
+        });
+      }
+
+      // dark line along the BOTTOM INNER corner of the drawer walls (where the
+      // walls meet the floor) — same base line as before, just DARKER and a
+      // touch thicker (rendered as a very short strip so it reads slightly bold)
+      {
+        const ix = DW / 2 - DT, iz = DL / 2 - DT;
+        const e = 0.003;                 // inset off the inner wall face (avoid z-fight)
+        const y0 = ST + 0.001, y1 = ST + 0.01;   // thin line (half thickness)
+        const lnMat = new THREE.MeshBasicMaterial({ color: 0x101215, side: THREE.DoubleSide });
+        function strip(a, b, c, d) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute([
+            a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2], d[0],d[1],d[2]
+          ], 3));
+          g.setIndex([0,1,2, 0,2,3]);
+          drawer.add(new THREE.Mesh(g, lnMat));
+        }
+        strip([-ix+e, y0, -iz], [-ix+e, y0, iz], [-ix+e, y1, iz], [-ix+e, y1, -iz]);   // left inner
+        strip([ ix-e, y0, -iz], [ ix-e, y0, iz], [ ix-e, y1, iz], [ ix-e, y1, -iz]);    // right inner
+        strip([-ix, y0, iz-e], [ ix, y0, iz-e], [ ix, y1, iz-e], [-ix, y1, iz-e]);      // front inner
+        strip([-ix, y0, -iz+e], [ ix, y0, -iz+e], [ ix, y1, -iz+e], [-ix, y1, -iz+e]);  // back inner
+      }
+
+      // VERTICAL dark lines cutting each inner corner along its full length
+      // (top → bottom), connecting to the base line — reads as the corner seam
+      {
+        const ix = DW / 2 - DT, iz = DL / 2 - DT;
+        const w = 0.01;                  // corner chamfer width (line thickness — half)
+        const y0 = ST + 0.001, y1 = DH;  // from the base line up to the top rim
+        const lnMat = new THREE.MeshBasicMaterial({ color: 0x101215, side: THREE.DoubleSide });
+        function strip(a, b, c, d) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute([
+            a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2], d[0],d[1],d[2]
+          ], 3));
+          g.setIndex([0,1,2, 0,2,3]);
+          drawer.add(new THREE.Mesh(g, lnMat));
+        }
+        const ty = DH + 0.001, hw = 0.0035;  // top-rim cap: y just above the rim, half-width (half)
+        [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => {
+          // vertical line down the inner corner
+          const p1 = [sx * ix,        y0, sz * (iz - w)];
+          const p2 = [sx * (ix - w),  y0, sz * iz];
+          const p3 = [sx * (ix - w),  y1, sz * iz];
+          const p4 = [sx * ix,        y1, sz * (iz - w)];
+          strip(p1, p2, p3, p4);
+          // continue the line ACROSS the top rim (inner corner → outer corner)
+          // so it wraps over the top edge and is visible from above
+          const inr = [sx * ix,       sz * iz];
+          const out = [sx * DW / 2,   sz * DL / 2];
+          strip(
+            [inr[0] - sz * hw, ty, inr[1] + sx * hw],
+            [inr[0] + sz * hw, ty, inr[1] - sx * hw],
+            [out[0] + sz * hw, ty, out[1] - sx * hw],
+            [out[0] - sz * hw, ty, out[1] + sx * hw]
+          );
+        }));
+      }
+
+      // seat the drawer on the sleeve interior floor
+      const drawerBaseY = -SH / 2 + ST;
+      drawer.position.y = drawerBaseY;
+
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const groundY = -SH / 2 - 0.001;
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.28 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = groundY;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 0 = drawer OUT (open), 1 = drawer IN (closed) ---------- */
+      const SLIDE = SL * 0.66;          // how far the drawer slides out
+      let foldTarget = 0, fold = 0;
+      function applyFold(t) {
+        drawer.position.z = SLIDE * (1 - t);   // slides toward +z as it opens
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.32, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const dd = camera.position.length();
+        if (dd < 5.0) camera.position.setLength(5.0);
+        if (dd > 18)  camera.position.setLength(18);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const dd = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - dd) * 0.004);
+          pinchDist = dd;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, sleeve, drawer, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ sliding drawer box ready");
+    }
+  </script>
+</body>
+</html>

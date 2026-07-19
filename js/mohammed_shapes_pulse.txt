@@ -1,0 +1,118 @@
+/*
+ * mohammed_shapes_pulse.c
+ * -------------------------------------------------------
+ * يعرض اسم "mohammed elhuseyin" مكرراً داخل أشكال هندسية
+ * (هرم - معين - مستطيل) مع تأثير نبض ألوان سريع.
+ *
+ * ملاحظة: البرنامج مخصص لـ Windows (يستخدم windows.h)
+ * شغّله من Code::Blocks / Dev-C++ / Visual Studio على ويندوز.
+ * اضغط Ctrl+C لإيقافه في أي وقت.
+ * -------------------------------------------------------
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <windows.h>
+
+#define NAME "mohammed elhuseyin"
+
+int consoleWidth = 80;
+int maxRepeats   = 6;
+
+/* يضبط لون النص في الكونسول */
+void setColor(int color) {
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+}
+
+void clearScreen(void) {
+    system("cls");
+}
+
+/* يقرأ عرض نافذة الكونسول الحالية */
+int getConsoleWidth(void) {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+        return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    return 80;
+}
+
+/* يطبع سطراً مُوسّطاً في الشاشة */
+void printCentered(const char *text) {
+    int len = (int)strlen(text);
+    int pad = (consoleWidth - len) / 2;
+    if (pad < 0) pad = 0;
+    for (int i = 0; i < pad; i++) putchar(' ');
+    printf("%s\n", text);
+}
+
+/* يبني سطراً من الاسم مكرراً count مرة، مفصول بمسافات */
+void buildRepeatedName(char *buffer, int count) {
+    buffer[0] = '\0';
+    for (int i = 0; i < count; i++) {
+        strcat(buffer, NAME);
+        if (i < count - 1) strcat(buffer, " ");
+    }
+}
+
+/* ---------- الأشكال ---------- */
+
+void drawPyramid(void) {
+    char buffer[2048];
+    for (int i = 1; i <= maxRepeats; i++) {
+        buildRepeatedName(buffer, i);
+        printCentered(buffer);
+    }
+}
+
+void drawDiamond(void) {
+    char buffer[2048];
+    for (int i = 1; i <= maxRepeats; i++) {
+        buildRepeatedName(buffer, i);
+        printCentered(buffer);
+    }
+    for (int i = maxRepeats - 1; i >= 1; i--) {
+        buildRepeatedName(buffer, i);
+        printCentered(buffer);
+    }
+}
+
+void drawRectangle(void) {
+    char buffer[2048];
+    for (int i = 0; i < maxRepeats; i++) {
+        buildRepeatedName(buffer, maxRepeats);
+        printCentered(buffer);
+    }
+}
+
+/* ---------- تأثير النبض ---------- */
+
+/* يعيد رسم نفس الشكل عدة مرات بألوان متغيرة بسرعة فائقة */
+void pulseShape(void (*drawFunc)(void), int cycles, int delayMs) {
+    int colors[] = { 12, 14, 10, 11, 13, 9, 15 }; /* أحمر,أصفر,أخضر,سماوي,وردي,أزرق,أبيض */
+    int numColors = (int)(sizeof(colors) / sizeof(colors[0]));
+
+    for (int c = 0; c < cycles; c++) {
+        clearScreen();
+        setColor(colors[c % numColors]);
+        drawFunc();
+        Sleep(delayMs); /* سرعة فائقة: قيمة صغيرة بالمللي ثانية */
+    }
+}
+
+int main(void) {
+    SetConsoleTitle("Mohammed Elhuseyin - Geometric Pulse");
+    consoleWidth = getConsoleWidth();
+
+    /* يحدد عدد التكرارات بحيث لا يتجاوز الشكل عرض الشاشة */
+    int fit = consoleWidth / ((int)strlen(NAME) + 1);
+    if (fit < 3) fit = 3;
+    maxRepeats = (fit > 8) ? 8 : fit;
+
+    while (1) {
+        pulseShape(drawPyramid,   20, 60);
+        pulseShape(drawDiamond,   20, 60);
+        pulseShape(drawRectangle, 20, 60);
+    }
+
+    return 0;
+}

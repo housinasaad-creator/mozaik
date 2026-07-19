@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Dört Köşe Yapıştırmalı Tepsi</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const WHITE = "#f6f5f2";
+    const BLUE  = "#2145a6";     // the interior blue from the reference photo
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 3.4, 7.6);
+      camera.lookAt(0, -0.2, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.6));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      function paperGrain(x, w, h, strength) {
+        const s = strength || 1;
+        for (let i = 0; i < w * h / 550; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.10 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.08 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5 + Math.random() * 1.5);
+        }
+        x.lineWidth = 1.4;
+        for (let i = 0; i < w * h / 2800; i++) {
+          const fx = Math.random() * w, fy = Math.random() * h;
+          const len = 4 + Math.random() * 12;
+          const ang = (Math.random() - 0.5) * 0.5;
+          const light = Math.random() > 0.45;
+          x.strokeStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.09 * s) + ")"
+            : "rgba(90,80,60,"   + (Math.random() * 0.075 * s) + ")";
+          x.beginPath();
+          x.moveTo(fx, fy);
+          x.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+          x.stroke();
+        }
+        for (let i = 0; i < 34; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 30 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.045 * s) + ")" : "rgba(255,255,255," + (0.05 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 30;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        for (let i = 0; i < 260; i++) {
+          x.strokeStyle = "rgba(" + (Math.random() > 0.5 ? "200,200,200" : "60,60,60") + ",0.08)";
+          const fy = Math.random() * 512, fx = Math.random() * 512;
+          x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx + 4 + Math.random() * 10, fy + (Math.random() - 0.5) * 2); x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainPanel(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* white wall + the Mozaik logo pasted exactly as supplied (centered) */
+      function logoPanelTexture(panelWpx, panelHpx, logoFrac) {
+        const c = document.createElement("canvas");
+        c.width = panelWpx; c.height = panelHpx;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, panelWpx, panelHpx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(panelWpx * logoFrac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (panelWpx - lw) / 2, (panelHpx - lh) / 2, lw, lh);
+        }
+        paperGrain(x, panelWpx, panelHpx, 0.5);
+        return toTexture(c);
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.85, bumpMap: bumpTex, bumpScale: 0.012, side: THREE.DoubleSide
+      });
+
+      /* inner face of the SIDE walls: white + the printed CREASE lines that
+         mark exactly where the folded corner triangles sit at both ends */
+      function creasedInnerTexture(wallLen, wPx, hPx) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, wPx, hPx);
+        const triW = Math.round(wPx * (0.72 / wallLen));   // web triangle width = WH
+        // soft shading over the triangle areas (the doubled cardboard)
+        [[0, 1], [wPx, -1]].forEach(([x0, dir]) => {
+          x.fillStyle = "rgba(60,55,45,0.06)";
+          x.beginPath();
+          x.moveTo(x0, hPx);
+          x.lineTo(x0, 0);
+          x.lineTo(x0 + dir * triW, 0);
+          x.closePath();
+          x.fill();
+          // the crease line itself — a firm visible fold mark
+          x.strokeStyle = "rgba(105,98,84,0.55)";
+          x.lineWidth = 4;
+          x.beginPath();
+          x.moveTo(x0, hPx);
+          x.lineTo(x0 + dir * triW, 0);
+          x.stroke();
+        });
+        paperGrain(x, wPx, hPx, 0.45);
+        return toTexture(c);
+      }
+
+      /* =========================================================
+         GEOMETRY — square FOUR-CORNER GLUED TRAY (white outside,
+         blue inside, logo on the front wall):
+           · flat square base, low walls hinged on all 4 edges
+           · at every corner a diagonal GUSSET web made of two
+             triangles — one creased to each adjacent wall — that
+             folds along its diagonal and doubles back against the
+             side wall exactly like the real glued corner
+           · slider = the whole folding motion: fully FLAT blank →
+             half-folded (the reference photo) → assembled tray
+         ========================================================= */
+      const W = 2.4, D = 2.4, WH = 0.72, T = 0.012;
+
+      const trayGroup = new THREE.Group();
+
+      const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
+      const blueTex  = plainPanel(1024, 1024, BLUE, 0.3);
+      const frontTex = logoPanelTexture(1200, 380, 0.4);
+
+      /* ---------- base: white below, BLUE interior above ---------- */
+      const plainW = () => cardMat(whiteTex);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), [
+        plainW(), plainW(), cardMat(blueTex), plainW(), plainW(), plainW()
+      ]);
+      base.position.y = T / 2;
+      base.castShadow = base.receiveShadow = true;
+      trayGroup.add(base);
+
+      /* ---------- walls + corner gussets ----------
+         each wall: fixed FRAME (orientation) → animated HINGE (rotation.x
+         only) → BoxGeometry wall + two gusset pivots on its side edges.
+         Uniform local convention: local -z = tray interior for every wall. */
+      function makeWall(width, frameRotY, framePos, faceMats) {
+        const frame = new THREE.Group();
+        frame.rotation.y = frameRotY;
+        frame.position.copy(framePos);
+        trayGroup.add(frame);
+
+        const hinge = new THREE.Group();
+        frame.add(hinge);
+
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, WH, T), faceMats);
+        mesh.position.set(0, WH / 2, T / 2);       // thickness on the OUTER side of the hinge line
+        mesh.castShadow = mesh.receiveShadow = true;
+        hinge.add(mesh);
+
+        return { frame, hinge, mesh, width };
+      }
+
+      // logo centered on the OUTER face of ALL FOUR walls (index 4 = local +z,
+      // which every frame maps to its wall's outward world direction). The
+      // SIDE walls get the creased inner face (index 5 = local -z, interior)
+      // marking where the folded corner triangles sit
+      const mkLogoWallMats = (innerTex) => [
+        plainW(), plainW(), plainW(), plainW(),
+        cardMat(logoPanelTexture(1200, 380, 0.4)),
+        innerTex ? cardMat(innerTex) : plainW()
+      ];
+      const frontWall = makeWall(W, 0,        new THREE.Vector3(0, T, D / 2 - T), mkLogoWallMats());
+      const backWall  = makeWall(W, Math.PI,  new THREE.Vector3(0, T, -D / 2 + T), mkLogoWallMats());
+      const leftWall  = makeWall(D, -Math.PI / 2, new THREE.Vector3(-W / 2 + T, T, 0), mkLogoWallMats(creasedInnerTexture(D, 1200, 380)));
+      const rightWall = makeWall(D,  Math.PI / 2, new THREE.Vector3( W / 2 - T, T, 0), mkLogoWallMats(creasedInnerTexture(D, 1200, 380)));
+
+      const allWalls = [frontWall, backWall, leftWall, rightWall];
+
+      /* ---------- DYNAMIC corner gussets ----------
+         Each corner web is a triangle whose 3 vertices are pinned live to:
+           · the fixed base corner post
+           · the TOP corner of the adjacent front/back wall's end edge
+           · the TOP corner of the adjacent side wall's end edge
+         Because every vertex rides a real wall corner, the web stays welded
+         to both faces with NO gap, whatever the walls do — front/back fold
+         IN while left/right fold OUT, and the webs simply stretch to fill
+         each corner, lying flat when the tray is flat. */
+      const gussets = [];
+      function topCornerWorld(wall, sx) {
+        // top-outer corner of the wall's end edge, in world space
+        return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, WH, 0));
+      }
+      function addGusset(fbWall, fbSign, sideWall, cornerX, cornerZ) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+        geo.setIndex([0, 1, 2]);
+        const mesh = new THREE.Mesh(geo, cardMat(whiteTex));
+        mesh.castShadow = mesh.receiveShadow = true;
+        trayGroup.add(mesh);
+        // pick which end of the side wall is nearest this corner (once, at build)
+        const base = new THREE.Vector3(cornerX, T, cornerZ);
+        gussets.push({ mesh, geo, fbWall, fbSign, sideWall, base });
+      }
+      function matchSideSign(sideWall, cornerZ) {
+        // find the side wall end sign whose standing top corner is nearest z=cornerZ
+        trayGroup.updateMatrixWorld(true);
+        const a = topCornerWorld(sideWall, 1).z, b = topCornerWorld(sideWall, -1).z;
+        return Math.abs(a - cornerZ) < Math.abs(b - cornerZ) ? 1 : -1;
+      }
+      function updateGussets() {
+        trayGroup.updateMatrixWorld(true);
+        const tmp = new THREE.Vector3();
+        gussets.forEach((g) => {
+          const baseW = trayGroup.localToWorld(g.base.clone());   // base is tray-local
+          const pFB = topCornerWorld(g.fbWall, g.fbSign);         // already world
+          const pSide = topCornerWorld(g.sideWall, g.sideSign);   // already world
+          const pos = g.geo.attributes.position.array;
+          [baseW, pFB, pSide].forEach((p, i) => {
+            tmp.copy(p); g.mesh.worldToLocal(tmp);
+            pos[i * 3] = tmp.x; pos[i * 3 + 1] = tmp.y; pos[i * 3 + 2] = tmp.z;
+          });
+          g.geo.attributes.position.needsUpdate = true;
+          g.geo.computeVertexNormals();
+        });
+      }
+
+      // four corners (cornerX, cornerZ = the base post location)
+      addGusset(frontWall, -1, leftWall,  -W / 2,  D / 2);  // front-left
+      addGusset(frontWall,  1, rightWall,  W / 2,  D / 2);  // front-right
+      addGusset(backWall,   1, leftWall,  -W / 2, -D / 2);  // back-left
+      addGusset(backWall,  -1, rightWall,  W / 2, -D / 2);  // back-right
+      gussets.forEach((g) => { g.sideSign = matchSideSign(g.sideWall, g.base.z); });
+      // this box is a static standing tray (no fold slider) — the corner webs
+      // are only meaningful during folding, so hide them; the vertical walls
+      // already meet cleanly at each corner post
+      gussets.forEach((g) => { g.mesh.visible = false; });
+
+      scene.add(trayGroup);
+      trayGroup.position.y = -0.55;
+
+      const boxGroup = new THREE.Group();
+      boxGroup.add(trayGroup);
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.30 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -0.55 - 0.001;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state ----------
+         1 (default) = the CORRECT standing tray: all four walls vertical
+         0 (Open)    = flattened: the two opposite front/back walls fold IN
+                       over the base while the two opposite side walls fold
+                       OUT the other way — all at the SAME time, so the box
+                       lays flat. The dynamic corner webs stay welded to both
+                       adjacent walls the whole way, with no gaps. */
+      // no slider on this box — it stays the assembled standing tray. The
+      // fold rig is kept (for __debug) but locked to the standing state.
+      function applyFold(t) {
+        const c = 1 - t;                                  // collapse fraction
+        const a = (Math.PI / 2) * c;
+        frontWall.hinge.rotation.x = -a;                  // fold INWARD, over the base
+        backWall.hinge.rotation.x  = -a;
+        leftWall.hinge.rotation.x  =  a;                  // fold OUTWARD, the other way
+        rightWall.hinge.rotation.x =  a;
+        updateGussets();
+      }
+      applyFold(1);
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.42, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const d = camera.position.length();
+        if (d < 4.5) camera.position.setLength(4.5);
+        if (d > 16)  camera.position.setLength(16);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const d = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - d) * 0.004);
+          pinchDist = d;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, trayGroup, frontWall, backWall, leftWall, rightWall, camera, scene,
+        setFold: (t) => applyFold(t) };
+
+      console.log("✓ four-corner tray ready");
+    }
+  </script>
+</body>
+</html>

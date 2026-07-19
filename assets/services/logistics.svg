@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 300" font-family="Georgia,serif">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#17294d"/><stop offset="1" stop-color="#0e1c3b"/></linearGradient></defs>
+  <rect width="440" height="300" rx="10" fill="url(#bg)"/>
+  <rect x="12" y="12" width="416" height="276" rx="6" fill="none" stroke="#c9a659" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="220" cy="118" r="46" fill="none" stroke="#c9a659" stroke-width="2"/>
+  <text x="220" y="134" text-anchor="middle" fill="#e9c877" font-size="42">▲</text>
+  <text x="220" y="205" text-anchor="middle" fill="#f3ecdd" font-size="22" font-weight="bold">Logistics & Delivery</text>
+  <text x="220" y="150" text-anchor="middle" fill="#e6297a" font-size="24" font-weight="bold" opacity="0.14" transform="rotate(-16 220 150)">SAMPLE &#183; نموذج</text>
+  <text x="220" y="238" text-anchor="middle" fill="#aeb6c6" font-size="12">Mozaik Ofset ve Ambalaj</text>
+  <text x="220" y="268" text-anchor="middle" fill="#8a7d55" font-size="10">Placeholder — replace with a real photo of this service</text>
+</svg>

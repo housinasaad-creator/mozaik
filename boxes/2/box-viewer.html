@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Bardak Taşıyıcı</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="1" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const CARDBOARD = "#f6f5f2";
+    const LID_BLACK = "#1c1c1e";
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 2.4, 7.2);
+      camera.lookAt(0, 0.3, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.6));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* paper fiber grain — the "touch of cardboard" (same recipe as the hex box) */
+      function paperGrain(x, w, h, strength) {
+        const s = strength || 1;
+        for (let i = 0; i < w * h / 550; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.10 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.08 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5 + Math.random() * 1.5);
+        }
+        x.lineWidth = 1.4;
+        for (let i = 0; i < w * h / 2800; i++) {
+          const fx = Math.random() * w, fy = Math.random() * h;
+          const len = 4 + Math.random() * 12;
+          const ang = (Math.random() - 0.5) * 0.5;
+          const light = Math.random() > 0.45;
+          x.strokeStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.09 * s) + ")"
+            : "rgba(90,80,60,"   + (Math.random() * 0.075 * s) + ")";
+          x.beginPath();
+          x.moveTo(fx, fy);
+          x.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+          x.stroke();
+        }
+        for (let i = 0; i < 34; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 30 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.045 * s) + ")" : "rgba(255,255,255," + (0.05 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 30;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        for (let i = 0; i < 260; i++) {
+          x.strokeStyle = "rgba(" + (Math.random() > 0.5 ? "200,200,200" : "60,60,60") + ",0.08)";
+          const fy = Math.random() * 512, fx = Math.random() * 512;
+          x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx + 4 + Math.random() * 10, fy + (Math.random() - 0.5) * 2); x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainCardboard(w, h, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = CARDBOARD;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* front panel: cardboard + the Mozaik logo pasted exactly as supplied
+         (never redrawn — centered on the panel, same on both faces — Three's
+         BoxGeometry UVs already read correctly on opposite faces, no mirror needed) */
+      function frontPanelTexture(panelWpx, panelHpx) {
+        const c = document.createElement("canvas");
+        c.width = panelWpx; c.height = panelHpx;
+        const x = c.getContext("2d");
+        x.fillStyle = CARDBOARD;
+        x.fillRect(0, 0, panelWpx, panelHpx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(panelWpx * 0.46);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (panelWpx - lw) / 2, (panelHpx - lh) / 2, lw, lh);
+        }
+        paperGrain(x, panelWpx, panelHpx, 0.55);
+        return toTexture(c);
+      }
+
+      /* the block's top face, die-cut with 2 round holes so the cups can sit
+         nested in it — built with THREE.Shape holes + a thin extrude for a
+         visible rim edge (matches the reference photo's cup-holder collar) */
+      function holedTopGeometry(w, d, holeR, holeXs, thickness) {
+        const shape = new THREE.Shape();
+        shape.moveTo(-w / 2, -d / 2);
+        shape.lineTo(w / 2, -d / 2);
+        shape.lineTo(w / 2, d / 2);
+        shape.lineTo(-w / 2, d / 2);
+        shape.closePath();
+        holeXs.forEach((hx) => {
+          const hole = new THREE.Path();
+          hole.absarc(hx, 0, holeR, 0, Math.PI * 2, true);
+          shape.holes.push(hole);
+        });
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, curveSegments: 32 });
+        // rotateX(-90°) alone already maps the extrude's z:[0,thickness] to
+        // local y:[0,thickness] — do NOT also translate, that double-shifts it
+        geo.rotateX(-Math.PI / 2);
+        return geo;
+      }
+
+      /* a single flat, tapered die-cut tab (petal): wide at the hole rim,
+         pointed at the tip — this is what actually gets folded up around
+         each hole to grip the cup */
+      function makePetalGeometry(baseW, height, tipW) {
+        const hw = baseW / 2, thw = (tipW || 0) / 2;
+        const geo = new THREE.BufferGeometry();
+        const verts = new Float32Array([
+          -hw, 0, 0,   hw, 0, 0,   thw, height, 0,   -thw, height, 0
+        ]);
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+        geo.setIndex([0, 1, 2, 0, 2, 3]);
+        geo.computeVertexNormals();
+        return geo;
+      }
+
+      /* a full ring of petals folded DOWN and slightly INWARD into the hole —
+         the real die-cut tabs that grip the cup from inside the socket
+         (visible when you look down into the empty hole), not sticking up
+         above the surface */
+      function addCrownCollar(parent, hx, hz, holeR, topY, mat, teeth, height, inwardTilt) {
+        const circumferencePerTooth = (2 * Math.PI * holeR) / teeth;
+        const baseW = circumferencePerTooth * 0.92;
+        for (let i = 0; i < teeth; i++) {
+          const angle = (i / teeth) * Math.PI * 2;
+          const petal = new THREE.Mesh(makePetalGeometry(baseW, height, baseW * 0.18), mat);
+          petal.position.set(hx + Math.cos(angle) * holeR, topY, hz + Math.sin(angle) * holeR);
+          petal.rotation.order = "YXZ";
+          petal.rotation.y = -angle + Math.PI / 2;      // base edge tangent to the hole
+          petal.rotation.x = Math.PI + inwardTilt;        // flipped DOWN, tip leaning IN toward the hole center
+          petal.castShadow = petal.receiveShadow = true;
+          parent.add(petal);
+        }
+      }
+
+      /* the die-cut glue tab on the short end wall — a separate flat piece of
+         cardboard sticking OUT past the box silhouette, with a softly rounded
+         outer-top corner (matches the reference close-up exactly) */
+      function sideTabGeometry(w, h, thickness, cornerR) {
+        const shape = new THREE.Shape();
+        shape.moveTo(0, 0);
+        shape.lineTo(w, 0);
+        shape.lineTo(w, h - cornerR);
+        shape.quadraticCurveTo(w, h, w - cornerR, h);
+        shape.lineTo(0, h);
+        shape.closePath();
+        return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, curveSegments: 16 });
+      }
+
+      function lidTexture() {
+        const c = document.createElement("canvas");
+        c.width = c.height = 256;
+        const x = c.getContext("2d");
+        x.fillStyle = LID_BLACK;
+        x.fillRect(0, 0, 256, 256);
+        // subtle sipper-lid ridge line + faint radial sheen (smooth plastic, not paper)
+        const g = x.createRadialGradient(128, 100, 10, 128, 128, 150);
+        g.addColorStop(0, "rgba(255,255,255,0.10)");
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        x.fillStyle = g;
+        x.fillRect(0, 0, 256, 256);
+        x.strokeStyle = "rgba(0,0,0,0.4)";
+        x.lineWidth = 6;
+        x.beginPath(); x.moveTo(60, 92); x.lineTo(196, 92); x.stroke();
+        return toTexture(c);
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.85, bumpMap: bumpTex, bumpScale: 0.015, side: THREE.DoubleSide
+      });
+      const cupMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.75, bumpMap: bumpTex, bumpScale: 0.008
+      });
+      const lidMat = new THREE.MeshStandardMaterial({
+        map: lidTexture(), metalness: 0.15, roughness: 0.35
+      });
+
+      /* =========================================================
+         GEOMETRY — a cardboard carrier block with 2 die-cut holes that
+         actually recede into real depth (a proper socket + visible
+         inner tunnel wall + a shadowed floor at the bottom), not just
+         a thin surface cut. Built from:
+           1) an outer shell (floor + 4 walls, thin panels)
+           2) an inset "tunnel" plug with the same 2 holes bored through
+              most of the block height, sitting just inside the shell —
+              this is what you actually see when a cup lifts out
+           3) a small raised collar around each hole for a tactile edge
+         ========================================================= */
+      const TRAY_W = 3.6, TRAY_D = 1.85, BLOCK_H = 0.62, WALL_T = 0.035, FLOOR_T = 0.04;
+      const CUP_SPACING = 1.55;
+      const CUP_TOP_R = 0.54, CUP_BOT_R = 0.47, CUP_H = 1.0;
+      const HOLE_R = CUP_TOP_R + 0.035;
+      const TUNNEL_DEPTH = 0.46;          // how far the visible socket recedes
+      const CROWN_TEETH = 9, CROWN_H = 0.17, CROWN_TILT = 0.32; // die-cut petal crown around each hole
+
+      const trayGroup = new THREE.Group();
+      const holeXs = [-CUP_SPACING / 2, CUP_SPACING / 2];
+
+      const sideTex  = plainCardboard(1024, 256, 0.65);
+      const frontTex = frontPanelTexture(1400, 300);
+      const backTex  = frontPanelTexture(1400, 300);
+
+      // 1) outer shell — floor + 4 walls (logo on BOTH the front and back)
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(TRAY_W, FLOOR_T, TRAY_D), cardMat(sideTex));
+      floor.position.y = FLOOR_T / 2;
+      floor.castShadow = floor.receiveShadow = true;
+      trayGroup.add(floor);
+
+      // BoxGeometry face order is [+x,-x,+y,-y,+z,-z] = [right,left,top,bottom,front,back] —
+      // the logo must ONLY sit on the single outward-facing side, never on the
+      // wall's own top/bottom/inward faces (that was the "logo visible from
+      // above" bug: a plain single material paints ALL 6 faces with the logo)
+      const plainSide = () => cardMat(sideTex);
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(TRAY_W, BLOCK_H, WALL_T), [
+        plainSide(), plainSide(), plainSide(), plainSide(), plainSide(), cardMat(backTex)
+      ]);
+      backWall.position.set(0, BLOCK_H / 2 + FLOOR_T, -TRAY_D / 2 + WALL_T / 2);
+      backWall.castShadow = backWall.receiveShadow = true;
+      trayGroup.add(backWall);
+
+      const frontWall = new THREE.Mesh(new THREE.BoxGeometry(TRAY_W, BLOCK_H, WALL_T), [
+        plainSide(), plainSide(), plainSide(), plainSide(), cardMat(frontTex), plainSide()
+      ]);
+      frontWall.position.set(0, BLOCK_H / 2 + FLOOR_T, TRAY_D / 2 - WALL_T / 2);
+      frontWall.castShadow = frontWall.receiveShadow = true;
+      trayGroup.add(frontWall);
+
+      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, BLOCK_H, TRAY_D), cardMat(sideTex));
+      leftWall.position.set(-TRAY_W / 2 + WALL_T / 2, BLOCK_H / 2 + FLOOR_T, 0);
+      leftWall.castShadow = leftWall.receiveShadow = true;
+      trayGroup.add(leftWall);
+
+      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, BLOCK_H, TRAY_D), cardMat(sideTex));
+      rightWall.position.set(TRAY_W / 2 - WALL_T / 2, BLOCK_H / 2 + FLOOR_T, 0);
+      rightWall.castShadow = rightWall.receiveShadow = true;
+      trayGroup.add(rightWall);
+
+      // die-cut glue tabs on all 4 corners of the two SHORT (left/right) walls —
+      // separate thin flaps sticking OUT past the box silhouette, full wall
+      // height, each with a rounded outer-top corner
+      const TAB_W = 0.16, TAB_H = BLOCK_H + FLOOR_T, TAB_THICK = WALL_T;
+      const tabGeo = sideTabGeometry(TAB_W, TAB_H, TAB_THICK, TAB_W * 0.42);
+      function addGlueTab(side, front) {
+        const tab = new THREE.Mesh(tabGeo, cardMat(sideTex));
+        if (side > 0) {
+          tab.rotation.y = 0;
+          tab.position.set(TRAY_W / 2, 0, front ? (TRAY_D / 2 - TAB_THICK) : -TRAY_D / 2);
+        } else {
+          tab.rotation.y = Math.PI;
+          tab.position.set(-TRAY_W / 2, 0, front ? TRAY_D / 2 : (-TRAY_D / 2 + TAB_THICK));
+        }
+        tab.castShadow = tab.receiveShadow = true;
+        trayGroup.add(tab);
+      }
+      addGlueTab(1, true);   // right-front
+      addGlueTab(1, false);  // right-back
+      addGlueTab(-1, true);  // left-front
+      addGlueTab(-1, false); // left-back
+
+      // 2) the holed "tunnel" plug — inset so its own outer edge hides just
+      //    behind the shell walls, extruded deep enough to read as a real socket
+      const tunnelPlug = new THREE.Mesh(
+        holedTopGeometry(TRAY_W - WALL_T * 0.6, TRAY_D - WALL_T * 0.6, HOLE_R, holeXs, TUNNEL_DEPTH),
+        [cardMat(sideTex), cardMat(sideTex)]
+      );
+      tunnelPlug.position.y = FLOOR_T + BLOCK_H - TUNNEL_DEPTH;
+      tunnelPlug.castShadow = tunnelPlug.receiveShadow = true;
+      trayGroup.add(tunnelPlug);
+
+      // 3) die-cut petal crown around each hole — the pointed cardboard tabs
+      //    that grip the cup, folded up and slightly outward (matches the
+      //    reference close-up exactly instead of a smooth collar ring)
+      const crownTopY = FLOOR_T + BLOCK_H - 0.01;
+      holeXs.forEach((hx) => {
+        addCrownCollar(trayGroup, hx, 0, HOLE_R, crownTopY, cardMat(sideTex), CROWN_TEETH, CROWN_H, CROWN_TILT);
+      });
+
+      scene.add(trayGroup);
+      trayGroup.position.y = -0.55;
+
+      /* ---------- 2 nested coffee cups (paper cup + domed matte-black lid) ----------
+         seated relative to the TOP of the block (not the floor) so the visible
+         submersion stays proportionate no matter how tall the block is */
+      const TRAY_TOP_Y = trayGroup.position.y + FLOOR_T + BLOCK_H;
+      const SUBMERGE_FRAC = 0.35;
+      const SEAT_Y = TRAY_TOP_Y - CUP_H * SUBMERGE_FRAC;
+      const LIFT_Y = SEAT_Y + 1.6;                   // lifted fully clear when "open"
+
+      const cupTexA = cupMat(plainCardboard(512, 512, 0.45));
+      const cupTexB = cupMat(plainCardboard(512, 512, 0.45));
+
+      function makeCup(mat) {
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(
+          new THREE.CylinderGeometry(CUP_TOP_R, CUP_BOT_R, CUP_H, 28),
+          mat
+        );
+        body.position.y = CUP_H / 2;
+        body.castShadow = body.receiveShadow = true;
+        group.add(body);
+
+        // lid = short gripping skirt + a rounded dome cap (flattened sphere)
+        const skirtH = 0.11;
+        const skirt = new THREE.Mesh(
+          new THREE.CylinderGeometry(CUP_TOP_R * 1.06, CUP_TOP_R * 1.0, skirtH, 28),
+          lidMat
+        );
+        skirt.position.y = CUP_H + skirtH / 2 - 0.02;
+        skirt.castShadow = skirt.receiveShadow = true;
+        group.add(skirt);
+
+        const dome = new THREE.Mesh(
+          new THREE.SphereGeometry(CUP_TOP_R * 1.02, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.58),
+          lidMat
+        );
+        dome.scale.set(1, 0.62, 1);
+        dome.position.y = CUP_H + skirtH - 0.03;
+        dome.castShadow = dome.receiveShadow = true;
+        group.add(dome);
+
+        // small drinking opening on the dome's front-upper slope: a raised
+        // sipper rim (torus) around a dark recessed hole — real geometry,
+        // not just a texture line
+        const domeR = CUP_TOP_R * 1.02;
+        const theta = 0.55; // angle down from the very top of the dome
+        const holeCenter = new THREE.Vector3(
+          0,
+          dome.position.y + domeR * Math.cos(theta) * 0.62,
+          domeR * Math.sin(theta) * 0.99
+        );
+        const outward = new THREE.Vector3(0, Math.cos(theta), Math.sin(theta)).normalize();
+        const drinkR = CUP_TOP_R * 0.10;
+
+        const drinkHole = new THREE.Mesh(
+          new THREE.CircleGeometry(drinkR, 20),
+          new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.7 })
+        );
+        drinkHole.position.copy(holeCenter).addScaledVector(outward, -0.008);
+        drinkHole.lookAt(holeCenter.clone().add(outward));
+        group.add(drinkHole);
+
+        const sipperRim = new THREE.Mesh(
+          new THREE.TorusGeometry(drinkR * 1.3, drinkR * 0.24, 10, 22),
+          lidMat
+        );
+        sipperRim.position.copy(holeCenter).addScaledVector(outward, 0.01);
+        sipperRim.lookAt(holeCenter.clone().add(outward));
+        sipperRim.castShadow = true;
+        group.add(sipperRim);
+
+        return group;
+      }
+
+      const cupA = makeCup(cupTexA);
+      const cupB = makeCup(cupTexB);
+      cupA.position.set(-CUP_SPACING / 2, 0, 0);
+      cupB.position.set(CUP_SPACING / 2, 0, 0);
+      scene.add(cupA);
+      scene.add(cupB);
+
+      const boxGroup = new THREE.Group();   // pure rotation/drag pivot for the whole product
+      boxGroup.add(trayGroup);
+      boxGroup.add(cupA);
+      boxGroup.add(cupB);
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.30 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -0.55 - 0.001;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 0 = cups lifted out, 1 = cups seated in tray ---------- */
+      let foldTarget = 1, fold = 1;
+      function applyFold(t) {
+        const y = SEAT_Y + (LIFT_Y - SEAT_Y) * (1 - t);
+        cupA.position.y = y;
+        cupB.position.y = y;
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.30, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const d = camera.position.length();
+        if (d < 4.5) camera.position.setLength(4.5);
+        if (d > 16)  camera.position.setLength(16);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const d = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - d) * 0.004);
+          pinchDist = d;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, trayGroup, cupA, cupB, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ cup carrier tray ready");
+    }
+  </script>
+</body>
+</html>

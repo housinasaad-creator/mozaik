@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — ABOX Kutu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const WHITE = "#f6f5f2";
+    const KRAFT = "#b17d4b";     // warm kraft brown for the INSIDE of the corrugated board
+
+    /* load BOTH the horizontal colored logo and the M-mark, then init */
+    let logo = null, mark = null, loaded = 0;
+    function ready() { if (++loaded === 2) init(); }
+    const logoImg = new Image();
+    logoImg.onload  = () => { logo = logoImg; ready(); };
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); ready(); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+    const markImg = new Image();
+    markImg.onload  = () => { mark = markImg; ready(); };
+    markImg.onerror = () => { console.warn("logo-mark.png not found"); ready(); };
+    markImg.src = "assets/logo-mark.png";
+
+    function init() {
+      console.log("init, logo:", logo ? "ok" : "none", "mark:", mark ? "ok" : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 3.6, 10.5);
+      camera.lookAt(0, 0.2, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.64));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      function paperGrain(x, w, h, strength) {
+        const s = (strength == null ? 1 : strength) * 0.5;
+        for (let i = 0; i < w * h / 900; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.07 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.05 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.4 + Math.random() * 1.4, 1.4 + Math.random() * 1.4);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 18;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainPanel(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* white panel + a centered image (no rotation) */
+      function imgPanel(img, wPx, hPx, frac) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, wPx, hPx);
+        if (img) {
+          const ratio = img.naturalHeight / img.naturalWidth;
+          const lw = Math.round(wPx * frac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(img, (wPx - lw) / 2, (hPx - lh) / 2, lw, lh);
+        }
+        paperGrain(x, wPx, hPx, 0.4);
+        return toTexture(c);
+      }
+
+      /* ---------- CORRUGATED cardboard EDGE texture ----------
+         two liners (top + bottom) with a wavy fluted core between — this is
+         what you see on the cut edge of real corrugated board */
+      const corrCanvas = (function () {
+        const c = document.createElement("canvas");
+        c.width = 96; c.height = 48;
+        const x = c.getContext("2d");
+        x.fillStyle = "#c2905a"; x.fillRect(0, 0, 96, 48);          // kraft core
+        x.fillStyle = "#9a6a3c"; x.fillRect(0, 0, 96, 7); x.fillRect(0, 41, 96, 7);   // top + bottom liner
+        x.strokeStyle = "#7d5730"; x.lineWidth = 2.4; x.lineJoin = "round";
+        const per = 16, mid = 24, amp = 12;
+        x.beginPath();
+        for (let px = 0; px <= 96; px++) {
+          const y = mid + amp * Math.sin((px / per) * Math.PI * 2);
+          px === 0 ? x.moveTo(px, y) : x.lineTo(px, y);
+        }
+        x.stroke();
+        return c;
+      })();
+      function corrTex(lenAlong) {
+        const t = new THREE.CanvasTexture(corrCanvas);
+        t.encoding = THREE.sRGBEncoding;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(Math.max(1, Math.round(lenAlong / 0.11)), 1);
+        return t;
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.86, bumpMap: bumpTex, bumpScale: 0.011, side: THREE.DoubleSide
+      });
+
+      const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
+      const kraftTex = plainPanel(1024, 1024, KRAFT, 0.55);
+      const wMat = () => cardMat(whiteTex);          // plain white outer
+      const kMat = () => cardMat(kraftTex);          // kraft brown inner
+      const eMat = (len) => cardMat(corrTex(len));   // corrugated cut edge
+
+      /* =========================================================
+         GEOMETRY — ABOX shipping carton (RSC): every panel is a REAL
+         3-LAYER corrugated board — a thin WHITE outer liner, a thin
+         KRAFT inner liner, and a genuine wavy fluting sheet between
+         them (real geometry, seen on every cut edge). The OUTSIDE is
+         pure white everywhere (no brown at the corners); brown lives
+         only inside and inside the flute cross-section.
+         ========================================================= */
+      const BW = 2.6, BH = 1.7, BD = 1.7;   // body: width(x), height(y), depth(z)
+      const tL  = 0.004;                     // liner thickness (very thin, per side)
+      const gap = 0.024;                     // flute gap between the two liners
+      const TC  = 2 * tL + gap;              // total board thickness (~0.032 — very thin)
+      const amp = gap * 0.5 * 0.92;          // flute wave amplitude (deep, nearly liner-to-liner)
+      const per = 0.055;                     // flute pitch (tight waves = real corrugation feel)
+
+      /* faces order for BoxGeometry mats: [+x, -x, +y, -y, +z, -z] */
+      function boxMesh(w, h, d, mats) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      const kraftEdgeTex = plainPanel(1024, 256, KRAFT, 0.55);   // for thin liner edges (kraft)
+      /* a flat corrugated board in the local XY plane, thickness along +z,
+         OUTER (white / printed) face toward +z, INNER (kraft) toward -z.
+         The flute is a real wavy sheet spanning the gap; it is inset from the
+         panel border so the white outer liner alone reads at folded corners. */
+      const SHOW_FLUTE = true;    // internal wavy kraft sheet (mimics real corrugation) — KEPT ON. Its brown leak at the box corners is hidden by white corner posts, not by removing it.
+      function corrugatedBoard(w, h, outerMat, edgeKraft) {
+        const g = new THREE.Group();
+
+        // thin cut-edge liner colour. Body panels keep WHITE edges (so the box
+        // CORNERS stay white outside). FLAPS use KRAFT edges: from INSIDE the four
+        // flap-to-flap corners then read brown/merged instead of flashing white.
+        const eM = edgeKraft ? kMat : wMat;
+
+        // OUTER liner — printed/white face (+z); thin edges ALWAYS white so the
+        // closed lid perimeter / box corners stay white on the OUTSIDE.
+        const outer = boxMesh(w, h, tL, [wMat(), wMat(), wMat(), wMat(), outerMat, wMat()]);
+        outer.position.z = TC / 2 - tL / 2;
+        g.add(outer);
+
+        // INNER liner — kraft on the INSIDE surface (-z); thin edges per eM (kraft on
+        // flaps) so the flap-to-flap corners read brown/merged from INSIDE. The
+        // corrugation still reads from inside via the brown flute in the gap.
+        const inner = boxMesh(w, h, tL, [eM(), eM(), eM(), eM(), wMat(), kMat()]);
+        inner.position.z = -(TC / 2 - tL / 2);
+        g.add(inner);
+
+        // FLUTE — real wavy kraft sheet between the liners. DISABLED (SHOW_FLUTE):
+        // being at the board's mid-thickness it peeked brown at the exposed vertical
+        // corners at grazing angles no matter how far it was inset. The inside surfaces
+        // are already kraft via the inner liner, so dropping it loses nothing visible.
+        if (SHOW_FLUTE) {
+          const mrgX = TC * 4, mrgY = TC * 4;
+          const x0 = -w / 2 + mrgX, x1 = w / 2 - mrgX, y0 = -h / 2 + mrgY, y1 = h / 2 - mrgY;
+          const N = Math.max(8, Math.round((x1 - x0) / per * 2));
+          const pos = [], idx = [];
+          for (let i = 0; i <= N; i++) {
+            const x = x0 + (x1 - x0) * i / N;
+            const z = amp * Math.sin((x - x0) / per * Math.PI * 2);
+            pos.push(x, y0, z,  x, y1, z);
+          }
+          for (let i = 0; i < N; i++) {
+            const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
+            idx.push(a, c, b,  b, c, d);
+          }
+          const fg = new THREE.BufferGeometry();
+          fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+          fg.setIndex(idx);
+          fg.computeVertexNormals();
+          const fl = new THREE.Mesh(fg, cardMat(kraftEdgeTex));
+          fl.castShadow = fl.receiveShadow = true;
+          g.add(fl);
+        }
+
+        return g;
+      }
+
+      const boxGroup = new THREE.Group();
+
+      /* logo / mark textures */
+      const frontLogoTex = imgPanel(logo, 1040, 680, 0.72);   // horizontal logo on the long faces
+      const backLogoTex  = imgPanel(logo, 1040, 680, 0.72);
+      const markTexL     = imgPanel(mark, 680, 680, 0.5);
+      const markTexR     = imgPanel(mark, 680, 680, 0.5);
+
+      /* ---------- BODY (4 walls + closed bottom) ---------- */
+      const body = new THREE.Group();
+      boxGroup.add(body);
+
+      (function () { const b = corrugatedBoard(BW, BH, cardMat(frontLogoTex)); b.position.set(0, 0, BD / 2 - TC / 2); body.add(b); })();               // front (+z)
+      (function () { const b = corrugatedBoard(BW, BH, cardMat(backLogoTex));  b.rotation.y = Math.PI;      b.position.set(0, 0, -BD / 2 + TC / 2); body.add(b); })();  // back (-z)
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(markTexR)); b.rotation.y =  Math.PI / 2; b.position.set(BW / 2 - TC / 2, 0, 0); body.add(b); })(); // right (+x)
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(markTexL)); b.rotation.y = -Math.PI / 2; b.position.set(-BW / 2 + TC / 2, 0, 0); body.add(b); })(); // left (-x)
+
+      /* ---------- WHITE CORNER POSTS ----------
+         A slim WHITE column capping each vertical corner, same white as the faces so
+         it blends in. It simply COVERS the corrugated flute that would otherwise peek
+         at the corners — the flute itself stays; the four printed faces read clean. */
+      (function () {
+        const reach = TC;              // laps exactly one board-thickness → the post's inner faces sit FLUSH with the wall inner faces (no protrusion into the box)
+        const proud = 0.002;           // sits a hair proud of the faces (avoids z-fighting)
+        const sx = reach + proud, sz = reach + proud;
+        [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (s) {
+          // faces order [+x,-x,+y,-y,+z,-z]. ONLY the two OUTER faces (toward the corner)
+          // are WHITE to blend with the printed walls; every other face — inner sides,
+          // TOP and BOTTOM — is KRAFT so nothing reads white from inside or from above.
+          const m = [kMat(), kMat(), kMat(), kMat(), kMat(), kMat()];
+          m[s[0] > 0 ? 0 : 1] = wMat();   // outer X face → white
+          m[s[1] > 0 ? 4 : 5] = wMat();   // outer Z face → white
+          const post = new THREE.Mesh(new THREE.BoxGeometry(sx, BH, sz), m);
+          post.castShadow = post.receiveShadow = true;
+          post.position.set(s[0] * (BW / 2 + proud - sx / 2), 0, s[1] * (BD / 2 + proud - sz / 2));
+          body.add(post);
+        });
+      })();
+
+      /* bottom (-y) is built lower down as a real RSC base (ears + big flaps + center seam) */
+
+      /* ---------- TOP FLAPS (hinged, open via slider) ----------
+         each flap is a corrugated board laid horizontal (outer face up), on a
+         pivot group at its top hinge edge; rotating the pivot splays it open */
+      const flaps = new THREE.Group();
+      boxGroup.add(flaps);
+
+      const CENTER_GAP = 0.018;              // realistic seam left between the two CLOSED major flaps (they stop just short of center)
+      const majW = BW, majReach = BD / 2 - CENTER_GAP / 2;   // front/back (major) flaps — FULL width; length stops a hair before center → visible center seam
+      const minD = BD, minReach = BW / 2;   // left/right (minor/ear) flaps — FULL depth so their front/back edges meet the major flaps (merged at the corners)
+      const minLen = majReach;               // ear (minor) flap LENGTH = same as the big flaps
+      const RAISE = 0.004;                            // majors a hair above minors (no z-fight, no gap)
+
+      /* ---------- REALISTIC BOTTOM (RSC base) ----------
+         Mirrors the closed top: two EARS (left/right) fold in first, two BIG flaps
+         (front/back) close OVER them and stop a hair short of each other → same
+         CENTER_GAP seam as the lid. Static (the base is always shut). */
+      (function buildBottom() {
+        const yBase = -BH / 2;                          // outer (white) bottom plane
+        // one flat board, OUTER face DOWN (-y), outer surface sitting at plane `outerY`
+        function botBoard(w, h, outerY, cx, cz) {
+          const b = corrugatedBoard(w, h, wMat()); // white edges → no brown line on the outside bottom rim
+          b.rotation.x = Math.PI / 2;                    // outer (+z) → -y (face down/outward)
+          b.position.set(cx, outerY + TC / 2, cz);       // board centre → outer surface lands on outerY
+          body.add(b);
+        }
+        // EARS (left/right) — inner layer, a board-thickness ABOVE the big flaps
+        botBoard(minLen, minD, yBase + TC, -(BW / 2 - minLen / 2), 0);   // left ear
+        botBoard(minLen, minD, yBase + TC,  (BW / 2 - minLen / 2), 0);   // right ear
+        // BIG flaps (front/back) — OUTERMOST layer, meeting at the seam
+        botBoard(majW, majReach, yBase,  0,  (BD / 2 - majReach / 2));   // front big flap
+        botBoard(majW, majReach, yBase,  0, -(BD / 2 - majReach / 2));   // back big flap
+      })();
+
+      // a corrugated board tipped horizontal so its OUTER face points up (+y).
+      // The board is dropped by half its thickness so the OUTER (white) liner
+      // lands exactly in the pivot's fold-axis plane — the outer sheet then folds
+      // continuously around the wall's top edge with NO seam/gap on the outside.
+      function horizFlap(localW, localH) {
+        const holder = new THREE.Group();
+        const b = corrugatedBoard(localW, localH, wMat());   // white edges → NO brown line shows on the outside rim
+        b.rotation.x = -Math.PI / 2;   // outer (+z) → +y (up); local +y → world -z
+        b.position.y = -TC / 2;        // outer liner ↓ onto the fold axis (seamless)
+        holder.add(b);
+        return holder;
+      }
+
+      // MINOR left/right flaps FIRST (hinge flush at the wall's outer top edge)
+      const leftPivot = new THREE.Group();
+      leftPivot.position.set(-BW / 2, BH / 2, 0);
+      (function () { const b = horizFlap(minLen, minD); b.position.set(minLen / 2, 0, 0); leftPivot.add(b); })();
+      flaps.add(leftPivot);
+
+      const rightPivot = new THREE.Group();
+      rightPivot.position.set(BW / 2, BH / 2, 0);
+      (function () { const b = horizFlap(minLen, minD); b.position.set(-minLen / 2, 0, 0); rightPivot.add(b); })();
+      flaps.add(rightPivot);
+
+      // MAJOR front/back flaps — hinge at the wall's outer top edge, a hair higher
+      // so they lay OVER the minors with no gap and no z-fighting
+      const frontPivot = new THREE.Group();
+      frontPivot.position.set(0, BH / 2 + RAISE, BD / 2);
+      (function () { const b = horizFlap(majW, majReach); b.position.set(0, 0, -majReach / 2); frontPivot.add(b); })();
+      flaps.add(frontPivot);
+
+      const backPivot = new THREE.Group();
+      backPivot.position.set(0, BH / 2 + RAISE, -BD / 2);
+      (function () { const b = horizFlap(majW, majReach); b.position.set(0, 0, majReach / 2); backPivot.add(b); })();
+      flaps.add(backPivot);
+
+      scene.add(boxGroup);
+      boxGroup.position.y = 0.1;
+
+      /* ---------- soft ground shadow ---------- */
+      const groundY = -BH / 2 + 0.1 - 0.001;
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.28 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = groundY;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 0 = flaps OPEN (splayed), 1 = CLOSED (flat) ---------- */
+      const OPEN = 2.15;                 // ~123° splay
+      let foldTarget = 0, fold = 0;
+      // SEQUENCED closing, like a real carton: the small ears (minor L/R) fold in
+      // FIRST, then the big flaps (major F/B) come down OVER them — and stop a hair
+      // short of each other, leaving the realistic center seam (CENTER_GAP).
+      const MIN_END = 0.55;               // ears finish closing at t = 0.55; majors run 0.55 → 1
+      function applyFold(t) {
+        const minT = Math.min(1, t / MIN_END);              // ears: close over the first stage
+        const majT = Math.max(0, (t - MIN_END) / (1 - MIN_END)); // majors: close over the second stage
+        const aMin = OPEN * (1 - minT);
+        const aMaj = OPEN * (1 - majT);
+        leftPivot.rotation.z  =  aMin;
+        rightPivot.rotation.z = -aMin;
+        frontPivot.rotation.x =  aMaj;
+        backPivot.rotation.x  = -aMaj;
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.30, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const dd = camera.position.length();
+        if (dd < 5.5) camera.position.setLength(5.5);
+        if (dd > 20)  camera.position.setLength(20);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const dd = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - dd) * 0.004);
+          pinchDist = dd;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, body, flaps, frontPivot, backPivot, leftPivot, rightPivot, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ ABOX carton ready");
+    }
+  </script>
+</body>
+</html>

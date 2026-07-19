@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Burger Kutusu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const WHITE = "#f6f5f2";
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 3.0, 8.4);
+      camera.lookAt(0, 0.3, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.62));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* SOFT paper grain (light, like box 7) */
+      function paperGrain(x, w, h, strength) {
+        const s = (strength == null ? 1 : strength) * 0.5;
+        for (let i = 0; i < w * h / 900; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.07 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.05 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.4 + Math.random() * 1.4, 1.4 + Math.random() * 1.4);
+        }
+        for (let i = 0; i < 22; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 40 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.03 * s) + ")" : "rgba(255,255,255," + (0.035 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 18;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainPanel(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* white panel + the Mozaik logo pasted exactly as supplied (centered) */
+      function logoPanelTexture(wPx, hPx, frac) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, wPx, hPx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(wPx * frac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (wPx - lw) / 2, (hPx - lh) / 2, lw, lh);
+        }
+        paperGrain(x, wPx, hPx, 0.45);
+        return toTexture(c);
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.82, bumpMap: bumpTex, bumpScale: 0.007, side: THREE.DoubleSide
+      });
+
+      const smoothMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.82, side: THREE.DoubleSide
+      });
+
+      const interiorTex = (() => {
+        const c = document.createElement("canvas"); c.width = 512; c.height = 512;
+        const x = c.getContext("2d"); x.fillStyle = WHITE; x.fillRect(0, 0, 512, 512);
+        return toTexture(c);
+      })();
+      const iMat = () => smoothMat(interiorTex);
+
+      function smoothLogoPanelTexture(wPx, hPx, frac) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, wPx, hPx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(wPx * frac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (wPx - lw) / 2, (hPx - lh) / 2, lw, lh);
+        }
+        return toTexture(c);
+      }
+
+      /* a quad panel from 4 corner points (counter-clockwise), with UVs */
+      function quad(a, b, c2, d2, mat) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute([
+          a[0], a[1], a[2],  b[0], b[1], b[2],  c2[0], c2[1], c2[2],  d2[0], d2[1], d2[2]
+        ], 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+        geo.setIndex([0, 1, 2, 0, 2, 3]);
+        geo.computeVertexNormals();
+        const m = new THREE.Mesh(geo, mat);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      /* trapezoid-corrected quad: bottom edge (a→b) is wider, top edge (d→c) is
+         narrower — inset the top UVs so the texture stays undistorted */
+      function quadTrapez(a, b, c2, d2, mat) {
+        const bottomW = Math.sqrt((b[0]-a[0])**2 + (b[2]-a[2])**2);
+        const topW    = Math.sqrt((c2[0]-d2[0])**2 + (c2[2]-d2[2])**2);
+        const inset   = (1 - topW / bottomW) / 2;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute([
+          a[0], a[1], a[2],  b[0], b[1], b[2],  c2[0], c2[1], c2[2],  d2[0], d2[1], d2[2]
+        ], 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([
+          0, 0,   1, 0,   1 - inset, 1,   inset, 1
+        ], 2));
+        geo.setIndex([0, 1, 2, 0, 2, 3]);
+        geo.computeVertexNormals();
+        const m = new THREE.Mesh(geo, mat);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      /* an interlock WING: a triangle (inner corner, sticking-out TIP, base
+         corner) whose sharp tip is ROUNDED into a gentle curve via a
+         quadratic bezier — fan-triangulated from the inner corner */
+      function wing(pInner, pTip, pBase, round, mat) {
+        const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+        const Pi = V(pInner), Pt = V(pTip), Pb = V(pBase);
+        const A = Pt.clone().lerp(Pi, round);   // pulled in from the tip toward inner
+        const B = Pt.clone().lerp(Pb, round);   // pulled in from the tip toward base
+        const pos = [Pi.x, Pi.y, Pi.z];
+        const N = 20;
+        for (let i = 0; i <= N; i++) {
+          const t = i / N, mt = 1 - t;
+          const p = A.clone().multiplyScalar(mt * mt)
+            .add(Pt.clone().multiplyScalar(2 * mt * t))
+            .add(B.clone().multiplyScalar(t * t));
+          pos.push(p.x, p.y, p.z);
+        }
+        pos.push(Pb.x, Pb.y, Pb.z);
+        const n = pos.length / 3, idx = [];
+        for (let i = 1; i < n - 1; i++) idx.push(0, i, i + 1);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        geo.computeVertexNormals();
+        const m = new THREE.Mesh(geo, mat);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      /* =========================================================
+         GEOMETRY — classic BURGER CLAMSHELL box (like the Pacdora
+         model, simplified): a tray whose walls slope OUTWARD, and
+         a lid hinged at the back whose walls slope INWARD to a
+         flat roof, with a front tuck flap + two side ears.
+         The slider ONLY opens/closes the top lid (no flat unfold).
+         ========================================================= */
+      const BOT = 1.3;      // base bottom half-size
+      const TOP = 1.55;     // base top (rim) half-size — walls flare outward
+      const BASE_H = 0.85;
+      const LID_T = 1.3;    // lid roof half-size — lid walls slope back inward
+      const LID_H = 0.72;
+      const LID_INSET = 0.25;      // how far the roof edges sit in from the rim
+      const FLAP_H = 0.55;
+
+      const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
+      const roofTex  = logoPanelTexture(1024, 1024, 0.4);
+      const lidFaceTex = logoPanelTexture(1200, 520, 0.34);   // logo on every sloped lid face
+      const wMat = () => cardMat(whiteTex);
+      const lMat = () => cardMat(lidFaceTex);
+
+      const trayGroup = new THREE.Group();
+
+      /* ---------- base tray (walls flare outward) — smooth, no bump ---------- */
+      const sMat = () => smoothMat(interiorTex);
+      trayGroup.add(quad([-BOT, 0,  BOT], [ BOT, 0,  BOT], [ BOT, 0, -BOT], [-BOT, 0, -BOT], sMat()));          // floor
+      trayGroup.add(quad([-BOT, 0,  BOT], [ BOT, 0,  BOT], [ TOP, BASE_H,  TOP], [-TOP, BASE_H,  TOP], sMat())); // front
+      trayGroup.add(quad([ BOT, 0, -BOT], [-BOT, 0, -BOT], [-TOP, BASE_H, -TOP], [ TOP, BASE_H, -TOP], sMat())); // back
+      trayGroup.add(quad([-BOT, 0, -BOT], [-BOT, 0,  BOT], [-TOP, BASE_H,  TOP], [-TOP, BASE_H, -TOP], sMat())); // left
+      trayGroup.add(quad([ BOT, 0,  BOT], [ BOT, 0, -BOT], [ TOP, BASE_H, -TOP], [ TOP, BASE_H,  TOP], sMat())); // right
+
+      /* ---------- lid (hinged at the back rim edge) ----------
+         authored in CLOSED pose relative to the hinge pivot */
+      const lidPivot = new THREE.Group();
+      lidPivot.position.set(0, BASE_H, -TOP);
+      trayGroup.add(lidPivot);
+
+      /* the lid is EXACTLY the same size as the base rim — when closed its
+         edge sits right over the base edge; no tuck flap at all */
+      const D = TOP * 2;                       // lid bottom depth (local z: 0 → D)
+      const LW = TOP;                          // lid bottom half-width
+      const LTW = LID_T;                       // lid roof half-width
+      // lid walls (slope inward going up), PLUS a deeper SKIRT band that
+      // drops below the rim line so the lid is ~20% taller overall — the
+      // skirt bends OUTWARD at the rim (obtuse angle) as it goes down, so
+      // the overlap over the base is correct
+      const DROP = 0.28;                       // skirt depth below the rim
+      const FL = 0;                            // no flare — the skirt drops straight down (vertical)
+      lidPivot.add(quadTrapez([ LW, 0, 0], [-LW, 0, 0], [-LTW, LID_H, LID_INSET], [ LTW, LID_H, LID_INSET], lMat()));            // back
+      lidPivot.add(quadTrapez([-LW, 0, D], [ LW, 0, D], [ LTW, LID_H, D - LID_INSET], [-LTW, LID_H, D - LID_INSET], lMat()));    // front
+      lidPivot.add(quadTrapez([-LW, 0, 0], [-LW, 0, D], [-LTW, LID_H, D - LID_INSET], [-LTW, LID_H, LID_INSET], lMat()));        // left
+      lidPivot.add(quadTrapez([ LW, 0, D], [ LW, 0, 0], [ LTW, LID_H, LID_INSET], [ LTW, LID_H, D - LID_INSET], lMat()));        // right
+      // flared skirt band (rim line → -DROP, leaning outward)
+      lidPivot.add(quad([-(LW + FL), -DROP, D + FL], [ LW + FL, -DROP, D + FL], [ LW, 0, D], [-LW, 0, D], sMat()));        // front skirt
+      lidPivot.add(quad([-(LW + FL), -DROP, 0], [-(LW + FL), -DROP, D + FL], [-LW, 0, D], [-LW, 0, 0], sMat()));           // left skirt
+      lidPivot.add(quad([ LW + FL, -DROP, D + FL], [ LW + FL, -DROP, 0], [ LW, 0, 0], [ LW, 0, D], sMat()));               // right skirt
+      // interior white liners (hide the logo bleed-through from inside)
+      const E = 0.008;
+      lidPivot.add(quad([-LW+E, 0, E], [ LW-E, 0, E], [ LTW-E, LID_H, LID_INSET+E], [-LTW+E, LID_H, LID_INSET+E], iMat()));             // back inner
+      lidPivot.add(quad([ LW-E, 0, D-E], [-LW+E, 0, D-E], [-LTW+E, LID_H, D-LID_INSET-E], [ LTW-E, LID_H, D-LID_INSET-E], iMat()));     // front inner
+      lidPivot.add(quad([-LW+E, 0, D-E], [-LW+E, 0, E], [-LTW+E, LID_H, LID_INSET+E], [-LTW+E, LID_H, D-LID_INSET-E], iMat())); // left inner
+      lidPivot.add(quad([ LW-E, 0, E], [ LW-E, 0, D-E], [ LTW-E, LID_H, D-LID_INSET-E], [ LTW-E, LID_H, LID_INSET+E], iMat())); // right inner
+      // flat roof with the Mozaik logo (smooth, no grain/bump)
+      lidPivot.add(quad([-LTW, LID_H, D - LID_INSET], [ LTW, LID_H, D - LID_INSET], [ LTW, LID_H, LID_INSET], [-LTW, LID_H, LID_INSET], smoothMat(smoothLogoPanelTexture(1024, 1024, 0.4))));
+      // plain white liner just under the roof — hides the logo from INSIDE
+      lidPivot.add(quad([-LTW+E, LID_H-E, D - LID_INSET-E], [ LTW-E, LID_H-E, D - LID_INSET-E], [ LTW-E, LID_H-E, LID_INSET+E], [-LTW+E, LID_H-E, LID_INSET+E], iMat()));
+
+      // diagonal glue-fold crease triangles — SIDE walls only
+      // pushed DEEP behind the inner liners (E large) so they only read from
+      // INSIDE the box; the outer wall + inner liner occlude them from outside
+      {
+        const glueMat = new THREE.LineBasicMaterial({ color: 0x666666 });
+        const GT = 0.75;
+        const E = 0.02;
+        const CSEGS = 8;
+        function curvedLine(p0, p1, bulge, parent) {
+          const pts = [];
+          for (let i = 0; i <= CSEGS; i++) {
+            const t = i / CSEGS;
+            const x = p0[0] + (p1[0]-p0[0])*t;
+            const y = p0[1] + (p1[1]-p0[1])*t;
+            const z = p0[2] + (p1[2]-p0[2])*t;
+            const bend = Math.sin(t * Math.PI) * bulge;
+            pts.push(x, y + bend, z);
+          }
+          const verts = [];
+          for (let i = 0; i < CSEGS; i++) {
+            verts.push(pts[i*3],pts[i*3+1],pts[i*3+2],
+                       pts[(i+1)*3],pts[(i+1)*3+1],pts[(i+1)*3+2]);
+          }
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+          parent.add(new THREE.LineSegments(g, glueMat));
+        }
+        function straightLine(a, b, parent) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute([
+            a[0],a[1],a[2], b[0],b[1],b[2]], 3));
+          parent.add(new THREE.LineSegments(g, glueMat));
+        }
+        function glueTriangle(pTop, pBot, pOff, bulge, parent) {
+          straightLine(pTop, pBot, parent);
+          straightLine(pBot, pOff, parent);
+          curvedLine(pOff, pTop, bulge, parent);
+        }
+        // BASE — right wall
+        glueTriangle([TOP-E, BASE_H, TOP], [BOT-E, 0, BOT], [BOT-E, 0, BOT-GT], 0.06, trayGroup);
+        glueTriangle([TOP-E, BASE_H, -TOP], [BOT-E, 0, -BOT], [BOT-E, 0, -(BOT-GT)], 0.06, trayGroup);
+        // BASE — left wall
+        glueTriangle([-TOP+E, BASE_H, TOP], [-BOT+E, 0, BOT], [-BOT+E, 0, BOT-GT], 0.06, trayGroup);
+        glueTriangle([-TOP+E, BASE_H, -TOP], [-BOT+E, 0, -BOT], [-BOT+E, 0, -(BOT-GT)], 0.06, trayGroup);
+        // LID — right wall
+        const LGT = 0.6;
+        glueTriangle([LTW-E, LID_H, D-LID_INSET], [LW-E, 0, D], [LW-E, 0, D-LGT], 0.05, lidPivot);
+        glueTriangle([LTW-E, LID_H, LID_INSET], [LW-E, 0, 0], [LW-E, 0, LGT], 0.05, lidPivot);
+        // LID — left wall
+        glueTriangle([-LTW+E, LID_H, D-LID_INSET], [-LW+E, 0, D], [-LW+E, 0, D-LGT], 0.05, lidPivot);
+        glueTriangle([-LTW+E, LID_H, LID_INSET], [-LW+E, 0, 0], [-LW+E, 0, LGT], 0.05, lidPivot);
+      }
+
+      /* ---------- the CLOSING INTERLOCK at the two FRONT CORNERS ----------
+         exactly like the reference close-up:
+         · from the BASE: a small angular ear extending the side wall's plane
+           up past the rim at each front corner
+         · from the LID: a small diagonal flap at each front-bottom corner,
+           angling down-and-out OVER the base ear — the two overlap and read
+           as the hooked corner lock */
+      // base corner WINGS (like the reference): pointed flat tabs in the
+      // SIDE walls' planes, extending FORWARD past the two front corners —
+      // only at the front, where the two covers meet when closing. Long
+      // horizontal top edge out to the pointed tip, angled cut back down
+      // to the wall
+      // BASE wings: in the FRONT wall's plane, sticking out SIDEWAYS past
+      // each corner — the triangle "exits the front face"
+      const wingZ = (y) => BOT + (y / BASE_H) * (TOP - BOT);   // front wall plane z at height y
+      const WING_OUT = 0.2;                                    // shorter tips than before
+      [-1, 1].forEach((sx) => {
+        trayGroup.add(wing(
+          [sx * (TOP - 0.02), BASE_H, TOP],                    // inner corner
+          [sx * (TOP + WING_OUT), BASE_H, TOP],                // sticking-out tip (rounded)
+          [sx * (TOP - 0.02), BASE_H - 0.22, wingZ(BASE_H - 0.22)],  // base corner
+          0.4, wMat()));
+      });
+      // lid corner WINGS — the exact same pointed triangles as the base ones
+      // but VERTICALLY MIRRORED (upside-down), in the lid side walls' planes
+      // at its front corners: long edge along the skirt's bottom line pointing
+      // forward, angled cut going UP-back — so they oppose the base wings and
+      // interlock with them when the box closes
+      // LID wings: in the lid side SKIRT's plane (the ears), sticking out
+      // FORWARD past the front corners — perpendicular to the base wings, so
+      // when the box closes the two cross at each corner like a PLUS sign
+      [-1, 1].forEach((sx) => {
+        lidPivot.add(wing(
+          [sx * (LW + FL), -DROP, D + FL - 0.02],              // inner corner
+          [sx * (LW + FL), -DROP, D + FL + WING_OUT],          // sticking-out tip (rounded)
+          [sx * LW, 0, D - 0.02],                              // base corner (up on the wall)
+          0.72, wMat()));
+      });
+
+      scene.add(trayGroup);
+      trayGroup.position.y = -0.75;
+
+      const boxGroup = new THREE.Group();
+      boxGroup.add(trayGroup);
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.28 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -0.75 - 0.001;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 0 = lid open (back), 1 = closed ---------- */
+      const OPEN_ANGLE = 1.9;
+      let foldTarget = 0, fold = 0;
+      function applyFold(t) {
+        lidPivot.rotation.x = -OPEN_ANGLE * (1 - t);   // swings up & back around the rear hinge
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.3, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const dd = camera.position.length();
+        if (dd < 4.5) camera.position.setLength(4.5);
+        if (dd > 16)  camera.position.setLength(16);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const dd = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - dd) * 0.004);
+          pinchDist = dd;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, trayGroup, lidPivot, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ burger box ready");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 310" font-family="Georgia,serif">
+  <rect width="440" height="310" rx="10" fill="#f7f3e9"/>
+  <rect x="12" y="12" width="416" height="286" rx="6" fill="none" stroke="#c9a659" stroke-width="2"/>
+  <rect x="18" y="18" width="404" height="274" rx="4" fill="none" stroke="#c9a659" stroke-width="0.8" opacity="0.6"/>
+  <text x="220" y="62" text-anchor="middle" fill="#8a6a25" font-size="15" letter-spacing="4">CERTIFICATE</text>
+  <line x1="150" y1="74" x2="290" y2="74" stroke="#c9a659" stroke-width="1"/>
+  <text x="220" y="128" text-anchor="middle" fill="#1c2a4a" font-size="34" font-weight="bold">BRC</text>
+  <text x="220" y="158" text-anchor="middle" fill="#4a5570" font-size="15">Food Safety Standard</text>
+  <circle cx="220" cy="205" r="26" fill="none" stroke="#c9a659" stroke-width="2"/>
+  <text x="220" y="211" text-anchor="middle" fill="#c9a659" font-size="13" font-weight="bold">SEAL</text>
+  <text x="220" y="262" text-anchor="middle" fill="#8592a8" font-size="11">Mozaik Ofset ve Ambalaj</text>
+  <text x="220" y="180" text-anchor="middle" fill="#e6297a" font-size="26" font-weight="bold" opacity="0.16" transform="rotate(-18 220 175)">SAMPLE &#183; نموذج</text>
+  <text x="220" y="284" text-anchor="middle" fill="#a08a55" font-size="9">Placeholder — replace with the real certificate</text>
+</svg>

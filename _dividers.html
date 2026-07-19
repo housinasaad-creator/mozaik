@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mozaik — فواصل الأقسام</title>
+<link href="https://fonts.googleapis.com/css2?family=El+Messiri:wght@600;700&family=Tajawal:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{ --gold:#c9a659; --gold-soft:#e0c485; --bg:#0a1530; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{ font-family:"Tajawal",sans-serif; background:var(--bg); color:#eef; }
+  .head{ text-align:center; padding:34px 20px 6px; font-family:"El Messiri"; }
+  .head h1{ font-size:26px; font-weight:700 }
+  .head p{ opacity:.6; margin-top:8px; font-size:14px }
+  .demo{ position:relative; margin:0 auto; max-width:1100px; }
+  .demo .tag{ position:absolute; top:12px; inset-inline-start:20px; z-index:5; font-family:"El Messiri"; font-weight:700; color:var(--gold-soft); font-size:17px; letter-spacing:.5px }
+  .block{ height:150px; display:flex; align-items:center; justify-content:center; color:#98a6c4; font-size:14px; }
+  .top{ background:linear-gradient(160deg,#0a1120,#0d1730); }
+  .bot{ background:var(--bg); height:120px; }
+  .div{ position:relative; height:0; }
+  /* A — whisper hairline */
+  .dA{ height:2px; background:linear-gradient(90deg,transparent,rgba(201,166,89,.55),transparent); }
+  /* B — diamond ornament */
+  .dB{ display:flex; align-items:center; justify-content:center; height:24px; margin:-12px 0; }
+  .dB::before,.dB::after{ content:""; height:1px; width:38%; background:linear-gradient(90deg,transparent,rgba(201,166,89,.5)); }
+  .dB::after{ background:linear-gradient(270deg,transparent,rgba(201,166,89,.5)); }
+  .dB i{ width:12px; height:12px; margin:0 14px; transform:rotate(45deg); background:linear-gradient(135deg,var(--gold-soft),var(--gold)); box-shadow:0 0 14px rgba(201,166,89,.6); flex:none; }
+  /* C — mosaic tiles */
+  .dC{ display:flex; align-items:center; justify-content:center; gap:6px; height:22px; margin:-11px 0; -webkit-mask:linear-gradient(90deg,transparent,#000 25%,#000 75%,transparent); mask:linear-gradient(90deg,transparent,#000 25%,#000 75%,transparent); }
+  .dC i{ width:12px; height:12px; flex:none; background:rgba(201,166,89,.85); }
+  .dC i:nth-child(odd){ clip-path:polygon(50% 0,100% 100%,0 100%); }
+  .dC i:nth-child(even){ clip-path:polygon(0 0,100% 0,50% 100%); background:rgba(201,166,89,.5); }
+  /* D — glow arc */
+  .dD{ height:2px; background:linear-gradient(90deg,transparent,rgba(201,166,89,.4),transparent); }
+  .dD::after{ content:""; position:absolute; left:50%; top:1px; transform:translate(-50%,-50%); width:220px; height:70px; background:radial-gradient(circle,rgba(201,166,89,.32),transparent 70%); filter:blur(6px); }
+  /* E — double line + dot */
+  .dE{ display:flex; flex-direction:column; align-items:center; gap:5px; margin:-8px 0; }
+  .dE span{ height:1px; width:60%; background:linear-gradient(90deg,transparent,rgba(201,166,89,.45),transparent); }
+  .dE b{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,var(--gold-soft),var(--gold)); box-shadow:0 0 12px rgba(201,166,89,.7); }
+  /* F — gold wave stroke */
+  .dF{ height:0; }
+  .dF svg{ position:absolute; left:0; top:-20px; width:100%; height:40px; display:block; }
+</style>
+</head>
+<body>
+<div class="head"><h1>اختَر شكل الفاصل — A إلى F</h1><p>كلها بلمسة ذهبية تبيّن على الكحلي · قلّي الحرف وبطبّقه</p></div>
+
+<div class="demo"><span class="tag">A · خط ذهبي خفيف (الحالي)</span>
+  <div class="block top">الهيرو</div><div class="div dA"></div><div class="block bot">القسم التالي</div></div>
+
+<div class="demo"><span class="tag">B · معيّن ذهبي (زخرفة)</span>
+  <div class="block top">الهيرو</div><div class="div dB"><i></i></div><div class="block bot">القسم التالي</div></div>
+
+<div class="demo"><span class="tag">C · حافة موزاييك ذهبية</span>
+  <div class="block top">الهيرو</div><div class="div dC"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="block bot">القسم التالي</div></div>
+
+<div class="demo"><span class="tag">D · توهّج ذهبي بالمنتصف</span>
+  <div class="block top">الهيرو</div><div class="div dD"></div><div class="block bot">القسم التالي</div></div>
+
+<div class="demo"><span class="tag">E · خطّين + نقطة</span>
+  <div class="block top">الهيرو</div><div class="div dE"><span></span><span></span><b></b></div><div class="block bot">القسم التالي</div></div>
+
+<div class="demo"><span class="tag">F · موجة ذهبية رفيعة</span>
+  <div class="block top">الهيرو</div><div class="div dF"><svg viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 20 C150 0 300 40 450 20 S750 0 900 20 1050 40 1200 20" fill="none" stroke="rgba(201,166,89,.55)" stroke-width="1.5"/></svg></div><div class="block bot">القسم التالي</div></div>
+
+<div class="head"><p style="padding:20px">A / B / C / D / E / F — قلّي الحرف</p></div>
+</body>
+</html>

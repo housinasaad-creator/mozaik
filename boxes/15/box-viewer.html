@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Sıcak Yaldız Kutu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      /* studio backdrop: soft light core in the centre → deep navy → pure black
+         at the edges (a premium radial vignette, بدرجات الكحلي الغامق) */
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    /* ---------- modern glass fold control ---------- */
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      /* filled portion (gold) up to the thumb, rest is faint track */
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="1" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette: navy body + WHITE lid + gold foil mark ---------- */
+    const NAVY     = "#141a30";        // كحلي — the body walls + floor
+    const NAVY_HI  = "#212a45";        // lighter top of the navy gradient
+    const NAVY_LO  = "#080b18";        // darker base of the navy gradient
+    const PAPER_HI = "#f9fafc";        // أبيض — the white lid (top of gradient)
+    const PAPER    = "#eef0f4";
+    const PAPER_LO = "#e1e4ea";        // slightly greyer base → gives the white depth
+    const GOLD     = "#c9a05f";        // ذهبي — the foil-stamped Mozaik mark
+    const CARDBOARD = NAVY;
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* keep ONLY the "mozaik" wordmark — crop away the gold "OFSET VE AMBALAJ"
+         writing at the bottom (الكتابة الذهبية اللي بدنا نشيلها) */
+      const LOGO_KEEP = 0.811;   // top 81.1% of the art = wordmark, drops the subtitle
+      let logoSrc = logo;
+      if (logo && logo.naturalWidth) {
+        const cc = document.createElement("canvas");
+        cc.width = logo.naturalWidth;
+        cc.height = Math.round(logo.naturalHeight * LOGO_KEEP);
+        cc.getContext("2d").drawImage(logo, 0, 0);
+        cc.naturalWidth = cc.width; cc.naturalHeight = cc.height;
+        logoSrc = cc;
+      }
+
+      /* recolor the Mozaik mark to solid GOLD — the hot-foil stamp */
+      let logoGold = null;
+      if (logoSrc && logoSrc.naturalWidth) {
+        const gc = document.createElement("canvas");
+        gc.width = logoSrc.naturalWidth; gc.height = logoSrc.naturalHeight;
+        const gx = gc.getContext("2d");
+        gx.drawImage(logoSrc, 0, 0);
+        gx.globalCompositeOperation = "source-in";
+        gx.fillStyle = GOLD; gx.fillRect(0, 0, gc.width, gc.height);
+        gc.naturalWidth = gc.width; gc.naturalHeight = gc.height;
+        logoGold = gc;
+      }
+      const logoArt = logoGold || logoSrc;
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);   // transparent → the CSS gradient background shows through
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      // HDRI-grade tone mapping → richer highlights on the gold foil, cleaner display
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;   // let the transparent canvas reveal the CSS gradient
+
+      /* ---------- HDRI studio environment ----------
+         a hi-res equirectangular "photo studio": bright overhead dome, a soft
+         horizon, dark floor, plus three large softbox panels — so the gold foil
+         catches clean, elongated studio reflections (اضاءة HDRI) while the matte
+         navy board stays flat */
+      (function () {
+        const ec = document.createElement("canvas"); ec.width = 1024; ec.height = 512;
+        const ex = ec.getContext("2d");
+
+        // vertical sky→floor gradient (dome light at top, black studio floor)
+        const g = ex.createLinearGradient(0, 0, 0, 512);
+        g.addColorStop(0.00, "#f7f9ff");   // bright zenith
+        g.addColorStop(0.14, "#dfe6f2");
+        g.addColorStop(0.30, "#9aa6bd");
+        g.addColorStop(0.46, "#5c6577");   // horizon haze
+        g.addColorStop(0.56, "#2c3038");
+        g.addColorStop(0.72, "#141518");
+        g.addColorStop(1.00, "#000000");   // dark floor
+        ex.fillStyle = g; ex.fillRect(0, 0, 1024, 512);
+
+        // soft rounded softbox panels — the light sources the foil reflects
+        function softbox(cx, cy, w, h, peak) {
+          const gb = ex.createRadialGradient(cx, cy, Math.min(w, h) * 0.12, cx, cy, Math.max(w, h) * 0.62);
+          gb.addColorStop(0, "rgba(255,255,255," + peak + ")");
+          gb.addColorStop(0.55, "rgba(255,255,255," + (peak * 0.35) + ")");
+          gb.addColorStop(1, "rgba(255,255,255,0)");
+          ex.save();
+          ex.translate(cx, cy); ex.scale(1, h / w); ex.translate(-cx, -cy);
+          ex.fillStyle = gb; ex.beginPath();
+          ex.arc(cx, cy, Math.max(w, h) * 0.62, 0, Math.PI * 2); ex.fill();
+          ex.restore();
+        }
+        softbox(300, 150, 300, 150, 1.0);    // key softbox (upper left)
+        softbox(720, 175, 260, 130, 0.85);   // fill softbox (upper right)
+        softbox(512, 90,  520, 120, 0.7);     // wide overhead strip
+        // a faint warm bounce near the horizon → gives the gold a little warmth
+        const warm = ex.createLinearGradient(0, 210, 0, 300);
+        warm.addColorStop(0, "rgba(255,225,180,0)");
+        warm.addColorStop(0.5, "rgba(255,220,170,0.10)");
+        warm.addColorStop(1, "rgba(255,225,180,0)");
+        ex.fillStyle = warm; ex.fillRect(0, 210, 1024, 90);
+
+        const et = new THREE.CanvasTexture(ec);
+        et.mapping = THREE.EquirectangularReflectionMapping;
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        scene.environment = pmrem.fromEquirectangular(et).texture;
+        et.dispose(); pmrem.dispose();
+      })();
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 2.7, 10.6);
+      camera.lookAt(0, 0.15, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting — HDRI does most of the work; these shape the form ---------- */
+      scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2d38, 0.5));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.5);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xcfe0ff, 0.2);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      // warm rim/back light — grazes the top edges so the gold foil sparkles
+      const rim = new THREE.DirectionalLight(0xffe6b8, 0.35);
+      rim.position.set(-3, 5, -6);
+      scene.add(rim);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* paper fiber grain — same recipe used across every box in this collection */
+      function paperGrain(x, w, h, strength) {
+        const s = strength || 1;
+        for (let i = 0; i < w * h / 550; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.10 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.08 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5 + Math.random() * 1.5);
+        }
+        x.lineWidth = 1.4;
+        for (let i = 0; i < w * h / 2800; i++) {
+          const fx = Math.random() * w, fy = Math.random() * h;
+          const len = 4 + Math.random() * 12;
+          const ang = (Math.random() - 0.5) * 0.5;
+          const light = Math.random() > 0.45;
+          x.strokeStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.09 * s) + ")"
+            : "rgba(90,80,60,"   + (Math.random() * 0.075 * s) + ")";
+          x.beginPath();
+          x.moveTo(fx, fy);
+          x.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+          x.stroke();
+        }
+        // (removed the big soft radial mottles — they read as blotchy light/dark spots)
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 30;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        for (let i = 0; i < 260; i++) {
+          x.strokeStyle = "rgba(" + (Math.random() > 0.5 ? "200,200,200" : "60,60,60") + ",0.08)";
+          const fy = Math.random() * 512, fx = Math.random() * 512;
+          x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx + 4 + Math.random() * 10, fy + (Math.random() - 0.5) * 2); x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      /* graded navy fill — lighter top, darker base, plus a soft cool sheen near
+         the upper-centre, so the board reads rich and premium instead of flat */
+      function fillBoard(x, w, h) {
+        // clean top→bottom navy gradient only — no radial hotspots (they read as blotches)
+        const g = x.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0.0, NAVY_HI); g.addColorStop(0.5, NAVY); g.addColorStop(1.0, NAVY_LO);
+        x.fillStyle = g; x.fillRect(0, 0, w, h);
+      }
+
+      function plainCardboard(w, h, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        fillBoard(x, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* clean WHITE board — for the lid (roof + gable + handle) */
+      function fillWhite(x, w, h) {
+        const g = x.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0.0, PAPER_HI); g.addColorStop(0.55, PAPER); g.addColorStop(1.0, PAPER_LO);
+        x.fillStyle = g; x.fillRect(0, 0, w, h);
+      }
+      function plainWhite(w, h, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        fillWhite(x, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* logo panel: cardboard + the Mozaik logo pasted exactly as supplied
+         (never redrawn — centered on the panel) */
+      function logoPanelTexture(panelWpx, panelHpx, logoFrac) {
+        const c = document.createElement("canvas");
+        c.width = panelWpx; c.height = panelHpx;
+        const x = c.getContext("2d");
+        x.fillStyle = CARDBOARD;
+        x.fillRect(0, 0, panelWpx, panelHpx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(panelWpx * logoFrac);
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (panelWpx - lw) / 2, (panelHpx - lh) / 2, lw, lh);
+        }
+        paperGrain(x, panelWpx, panelHpx, 0.55);
+        return toTexture(c);
+      }
+
+      /* ExtrudeGeometry emits UVs in raw shape units — normalize the uv
+         bounding rect to [0,1] so CanvasTextures paint across the whole piece
+         instead of clamping into streaks */
+      function normalizeUVs(geo) {
+        const uv = geo.attributes.uv;
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        for (let i = 0; i < uv.count; i++) {
+          minU = Math.min(minU, uv.getX(i)); maxU = Math.max(maxU, uv.getX(i));
+          minV = Math.min(minV, uv.getY(i)); maxV = Math.max(maxV, uv.getY(i));
+        }
+        const su = maxU - minU || 1, sv = maxV - minV || 1;
+        for (let i = 0; i < uv.count; i++) {
+          uv.setXY(i, (uv.getX(i) - minU) / su, (uv.getY(i) - minV) / sv);
+        }
+        uv.needsUpdate = true;
+        return geo;
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.85, bumpMap: bumpTex, bumpScale: 0.015,
+        envMapIntensity: 0.0, side: THREE.DoubleSide   // navy board fully matte — no reflection
+      });
+
+      /* foil panel: navy board + a GOLD, metallic-glossy Mozaik mark. The maps gate
+         the shine to the mark only — the board around it stays matte navy. */
+      function foilPanelMaps(wPx, hPx, frac) {
+        const base = document.createElement("canvas"); base.width = wPx; base.height = hPx;
+        const bx = base.getContext("2d");
+        fillBoard(bx, wPx, hPx);   // graded navy board behind the foil mark
+
+        const rgh = document.createElement("canvas"); rgh.width = wPx; rgh.height = hPx;
+        const rx = rgh.getContext("2d");
+        rx.fillStyle = "#ffffff"; rx.fillRect(0, 0, wPx, hPx);   // board FULLY matte → no reflected blobs
+
+        const met = document.createElement("canvas"); met.width = wPx; met.height = hPx;
+        const mtx = met.getContext("2d");
+        mtx.fillStyle = "#000000"; mtx.fillRect(0, 0, wPx, hPx); // all dielectric (no metal tint on the ink)
+
+        // paper grain goes on the BOARD FIRST → the foil mark then sits clean on
+        // top of it, so the gold reads smooth (أملس) with no creasing over it
+        paperGrain(bx, wPx, hPx, 0.55);
+
+        if (logoArt) {
+          const ratio = logoArt.naturalHeight / logoArt.naturalWidth;
+          const lw = Math.round(wPx * frac);
+          const lh = Math.round(lw * ratio);
+          const stencil = (col) => {
+            const s = document.createElement("canvas");
+            s.width = logoArt.naturalWidth; s.height = logoArt.naturalHeight;
+            const sx = s.getContext("2d");
+            sx.drawImage(logoArt, 0, 0);
+            sx.globalCompositeOperation = "source-in";
+            sx.fillStyle = col; sx.fillRect(0, 0, s.width, s.height);
+            return s;
+          };
+          const px = (wPx - lw) / 2, py = (hPx - lh) / 2;
+          bx.drawImage(logoArt, px, py, lw, lh);          // gold colour
+          rx.drawImage(stencil("#1e1e1e"), px, py, lw, lh); // very glossy foil (~0.12) → sharp shine
+          mtx.drawImage(stencil("#f4f4f4"), px, py, lw, lh); // near-full metal (~0.96) → strong gold reflection
+        }
+        return { map: toTexture(base), rough: toTexture(rgh), metal: toTexture(met) };
+      }
+
+      /* NOTE: no bumpMap on the foil → the gold mark stays perfectly smooth (أملس),
+         no creasing; the shine comes from the HDRI environment reflection only */
+      const foilMat = (maps) => new THREE.MeshStandardMaterial({
+        map: maps.map, roughnessMap: maps.rough, metalnessMap: maps.metal,
+        metalness: 1.0, roughness: 1.0, envMapIntensity: 3.1, side: THREE.DoubleSide  // gold foil; board stays matte
+      });
+
+      /* =========================================================
+         GEOMETRY — carry-handle carton with a FLAT top:
+           · rectangular body, logo centered on all 4 walls
+           · two FLAT horizontal top panels hinged at the front/back
+             top edges, meeting at the center line — no slope
+           · each top panel continues at the center into a VERTICAL
+             crest fin — the two fins press back-to-back and carry
+             the die-cut stadium HANDLE hole through both
+           · triangles ONLY on the two short ends: vertical gable
+             triangles rising above the flat top, apex level with
+             the crest, recessed inward from the side-wall planes
+             (the visible depth), with a small round locking ear
+           · slider opens the box from the top: both flat panels
+             swing apart and the gable triangles flop outward
+         ========================================================= */
+      const BOX_W = 3.5, BOX_D = 1.7, BOX_H = 1.25, WALL_T = 0.0175, FLOOR_T = 0.02;  // wide, low box
+      const FIN_H = 0.6;
+      const HANDLE_LEN = 0.66, HANDLE_R = 0.105;
+      const GABLE_INSET = 0;                // triangles start right AT the side-wall plane, like the real fold
+      const GABLE_TILT = 0.52;              // the end triangles lean INWARD at a sharp angle (~30°)
+      const RUN = BOX_D / 2 - WALL_T;       // half-span of each flat top panel (hinges sit just inside the walls)
+      // triangle sized so its TILTED apex still reaches the crest-top level
+      const GABLE_H = (FIN_H + WALL_T) / Math.cos(GABLE_TILT);
+      // crest fin is a TRAPEZOID: full width at its base, narrowing with height
+      // at exactly the triangles' tilt angle — so its slanted ends lie flush
+      // against the leaning triangles (no open window, no poking through)
+      const FIN_TAN = Math.tan(GABLE_TILT);
+      const finHalfW = (y) => BOX_W / 2 - (y + WALL_T) * FIN_TAN - 0.006;
+      const TOP_Y = FLOOR_T + BOX_H;
+
+      const trayGroup = new THREE.Group();
+
+      const sideCard  = plainCardboard(1024, 512, 0.6);
+      const frontMaps = foilPanelMaps(1400, 500, 0.46);   // wide front/back walls — bigger logo
+      const backMaps  = foilPanelMaps(1400, 500, 0.46);
+      const leftMaps  = foilPanelMaps(950, 700, 0.82);    // short end walls — bigger logo
+      const rightMaps = foilPanelMaps(950, 700, 0.82);
+
+      /* bottom face: cardboard + the center SEAM line where the two glued
+         closure flaps of a real folding carton meet */
+      function floorSeamTexture(w, h) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        fillBoard(x, w, h);
+        // soft shadow band on each side of the seam (the flaps' slight bow)
+        const g = x.createLinearGradient(0, h / 2 - 26, 0, h / 2 + 26);
+        g.addColorStop(0,   "rgba(0,0,0,0)");
+        g.addColorStop(0.5, "rgba(60,52,40,0.16)");
+        g.addColorStop(1,   "rgba(0,0,0,0)");
+        x.fillStyle = g;
+        x.fillRect(0, h / 2 - 26, w, 52);
+        // the seam gap itself — a thin dark line across the full length
+        x.strokeStyle = "rgba(90,80,62,0.55)";
+        x.lineWidth = 3;
+        x.beginPath(); x.moveTo(0, h / 2); x.lineTo(w, h / 2); x.stroke();
+        // faint highlight on the upper flap edge (catches the light)
+        x.strokeStyle = "rgba(255,255,255,0.30)";
+        x.lineWidth = 2;
+        x.beginPath(); x.moveTo(0, h / 2 - 3); x.lineTo(w, h / 2 - 3); x.stroke();
+        paperGrain(x, w, h, 0.6);
+        return toTexture(c);
+      }
+      const floorTex = floorSeamTexture(1024, 760);
+
+      /* ---------- body: floor + 4 walls (logo on every outward face) ---------- */
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, FLOOR_T, BOX_D), [
+        cardMat(sideCard), cardMat(sideCard), cardMat(sideCard),
+        cardMat(floorTex),                       // -y: the outside bottom shows the seam
+        cardMat(sideCard), cardMat(sideCard)
+      ]);
+      floor.position.y = FLOOR_T / 2;
+      floor.castShadow = floor.receiveShadow = true;
+      trayGroup.add(floor);
+
+      // BoxGeometry face order [+x,-x,+y,-y,+z,-z] — logo ONLY on the single
+      // outward-facing side of each wall, plain cardboard everywhere else
+      const plainSide = () => cardMat(sideCard);
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, WALL_T), [
+        plainSide(), plainSide(), plainSide(), plainSide(), plainSide(), foilMat(backMaps)
+      ]);
+      backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + WALL_T / 2);
+      backWall.castShadow = backWall.receiveShadow = true;
+      trayGroup.add(backWall);
+
+      const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, WALL_T), [
+        plainSide(), plainSide(), plainSide(), plainSide(), foilMat(frontMaps), plainSide()
+      ]);
+      frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - WALL_T / 2);
+      frontWall.castShadow = frontWall.receiveShadow = true;
+      trayGroup.add(frontWall);
+
+      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, BOX_H, BOX_D), [
+        plainSide(), foilMat(leftMaps), plainSide(), plainSide(), plainSide(), plainSide()
+      ]);
+      leftWall.position.set(-BOX_W / 2 + WALL_T / 2, BOX_H / 2 + FLOOR_T, 0);
+      leftWall.castShadow = leftWall.receiveShadow = true;
+      trayGroup.add(leftWall);
+
+      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, BOX_H, BOX_D), [
+        foilMat(rightMaps), plainSide(), plainSide(), plainSide(), plainSide(), plainSide()
+      ]);
+      rightWall.position.set(BOX_W / 2 - WALL_T / 2, BOX_H / 2 + FLOOR_T, 0);
+      rightWall.castShadow = rightWall.receiveShadow = true;
+      trayGroup.add(rightWall);
+
+      /* ---------- crest fin: vertical extension above the ridge carrying the
+         stadium handle hole — one per roof panel, pressed back-to-back ---------- */
+      function finGeometry() {
+        const cr = 0.04;
+        const wBot = finHalfW(0), wUp = finHalfW(FIN_H - cr), wTop = finHalfW(FIN_H);
+        const shape = new THREE.Shape();
+        shape.moveTo(-wBot, 0);
+        shape.lineTo(wBot, 0);
+        shape.lineTo(wUp, FIN_H - cr);
+        shape.quadraticCurveTo(wTop, FIN_H, wTop - cr, FIN_H);
+        shape.lineTo(-wTop + cr, FIN_H);
+        shape.quadraticCurveTo(-wTop, FIN_H, -wUp, FIN_H - cr);
+        shape.closePath();
+
+        // stadium (obround) handle hole, centered
+        const hy = FIN_H * 0.52;
+        const hw = HANDLE_LEN / 2 - HANDLE_R;
+        const hole = new THREE.Path();
+        hole.moveTo(-hw, hy - HANDLE_R);
+        hole.lineTo(hw, hy - HANDLE_R);
+        hole.absarc(hw, hy, HANDLE_R, -Math.PI / 2, Math.PI / 2, false);
+        hole.lineTo(-hw, hy + HANDLE_R);
+        hole.absarc(-hw, hy, HANDLE_R, Math.PI / 2, Math.PI * 1.5, false);
+        shape.holes.push(hole);
+
+        return normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: WALL_T, bevelEnabled: false, curveSegments: 24 }));
+      }
+
+      /* ---------- roof lids: sloped panel + crest fin, one group each,
+         authored in CLOSED pose relative to a hinge pivot at the wall's
+         top edge so applyFold only ever touches pivot.rotation.x ---------- */
+      const roofTexF = plainWhite(1024, 512, 0.5);   // white lid
+      const roofTexB = plainWhite(1024, 512, 0.5);
+
+      // front lid — pivot at the front wall's top inner edge; the panel lies
+      // FLAT (horizontal) from the wall to the center line
+      const frontLid = new THREE.Group();
+      frontLid.position.set(0, TOP_Y, RUN);
+      trayGroup.add(frontLid);
+
+      const frontPanel = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, WALL_T, RUN), cardMat(roofTexF));
+      frontPanel.position.set(0, WALL_T / 2, -RUN / 2);
+      frontPanel.castShadow = frontPanel.receiveShadow = true;
+      frontLid.add(frontPanel);
+
+      const frontFin = new THREE.Mesh(finGeometry(), cardMat(roofTexF));
+      frontFin.position.set(0, WALL_T, -RUN);        // extrudes z:[0,WALL_T] → sits on the front side of the center plane
+      frontFin.castShadow = frontFin.receiveShadow = true;
+      frontLid.add(frontFin);
+
+      // back lid — pivot at the back wall's top inner edge
+      const backLid = new THREE.Group();
+      backLid.position.set(0, TOP_Y, -RUN);
+      trayGroup.add(backLid);
+
+      const backPanel = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, WALL_T, RUN), cardMat(roofTexB));
+      backPanel.position.set(0, WALL_T / 2, RUN / 2);
+      backPanel.castShadow = backPanel.receiveShadow = true;
+      backLid.add(backPanel);
+
+      const backFin = new THREE.Mesh(finGeometry(), cardMat(roofTexB));
+      backFin.position.set(0, WALL_T, RUN - WALL_T); // pressed back-to-back against the front fin
+      backFin.castShadow = backFin.receiveShadow = true;
+      backLid.add(backFin);
+
+      // round locking tabs: discs centered ON the fin's slanted end edges,
+      // a bit below the top corners — half pokes out past the crest, reading
+      // as the die-cut tab pierced through the handle. ONE PER FIN FACE
+      // (front and back), so when the box opens each handle face keeps its
+      // own tab stuck to it from both sides
+      function addLockTab(sign) {
+        const yEdge = FIN_H - 0.18 * Math.cos(GABLE_TILT);   // lowered along the slanted edge for realism
+        const x = sign * finHalfW(yEdge), y = WALL_T + yEdge;
+        const mkDisc = (tex) => {
+          const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, WALL_T * 1.6, 24), cardMat(tex));
+          ear.rotation.x = Math.PI / 2;                       // disc plane parallel to the fin
+          ear.castShadow = ear.receiveShadow = true;
+          return ear;
+        };
+        const frontEar = mkDisc(roofTexF);
+        frontEar.position.set(x, y, -RUN + WALL_T / 2);       // glued to the front fin
+        frontLid.add(frontEar);
+        const backEar = mkDisc(roofTexB);
+        backEar.position.set(x, y, RUN - WALL_T / 2);         // glued to the back fin
+        backLid.add(backEar);
+      }
+      addLockTab(1);
+      addLockTab(-1);
+
+      /* ---------- gable ends: recessed triangles + round locking ear,
+         hinged at the side-wall top edge so they flop OUTWARD on open ---------- */
+      function gableGeometry(sign) {
+        const shape = new THREE.Shape();
+        shape.moveTo(-RUN, 0);
+        shape.lineTo(RUN, 0);
+        shape.lineTo(0, GABLE_H);
+        shape.closePath();
+        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: WALL_T, bevelEnabled: false }));
+        // shape-x → world z, extrude → inward along x (mirrored per side)
+        geo.rotateY(sign > 0 ? -Math.PI / 2 : Math.PI / 2);
+        return geo;
+      }
+
+      const gableTex = plainWhite(700, 500, 0.5);    // white gable ends
+      function makeGable(sign) {
+        const pivot = new THREE.Group();
+        pivot.position.set(sign * (BOX_W / 2 - GABLE_INSET), TOP_Y, 0);
+        trayGroup.add(pivot);
+
+        const tri = new THREE.Mesh(gableGeometry(sign), cardMat(gableTex));
+        tri.castShadow = tri.receiveShadow = true;
+        pivot.add(tri);
+
+        return pivot;
+      }
+      const rightGable = makeGable(1);
+      const leftGable  = makeGable(-1);
+
+      scene.add(trayGroup);
+      trayGroup.position.y = -1.05;
+
+      const boxGroup = new THREE.Group();
+      boxGroup.add(trayGroup);
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.30 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -1.05 - 0.001;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 1 = closed, 0 = open from the top ---------- */
+      const LID_OPEN = 1.9, GABLE_OPEN = 1.45;
+      let foldTarget = 1, fold = 1;
+      function applyFold(t) {
+        const open = 1 - t;
+        frontLid.rotation.x = open * LID_OPEN;        // swings forward-down
+        backLid.rotation.x = -open * LID_OPEN;        // swings backward-down
+        // closed: leaning INWARD at the sharp tilt · open: flopped outward
+        rightGable.rotation.z = GABLE_TILT * t - open * GABLE_OPEN;
+        leftGable.rotation.z = -GABLE_TILT * t + open * GABLE_OPEN;
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;                 // 0 = open, 1 = closed
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.30, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const d = camera.position.length();
+        if (d < 5)  camera.position.setLength(5);
+        if (d > 17) camera.position.setLength(17);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const d = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - d) * 0.004);
+          pinchDist = d;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, trayGroup, frontLid, backLid, leftGable, rightGable, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ gable box ready");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Sürgülü Kutu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background:
+        radial-gradient(85% 70% at 50% 47%,
+          #aebbd4 0%,
+          #64789c 3%,
+          #384a6d 7%,
+          #253350 13%,
+          #1a2640 22%,
+          #111b32 38%,
+          #0a1122 60%,
+          #050813 83%,
+          #010204 100%);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+    .fold-ctrl {
+      position: fixed;
+      bottom: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 11;
+      padding: .62rem 1.05rem;
+      border-radius: 999px;
+      background: rgba(15, 22, 42, 0.42);
+      border: 1px solid rgba(201,160,95,0.28);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      backdrop-filter: blur(14px) saturate(140%);
+      touch-action: pan-x;
+    }
+    .fold-ctrl .lbl {
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      transition: color .25s ease, text-shadow .25s ease;
+      user-select: none;
+    }
+    .fold-ctrl .lbl.active {
+      color: #e8c589;
+      text-shadow: 0 0 12px rgba(201,160,95,.5);
+    }
+    .fold-ctrl input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 168px;
+      height: 4px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #c9a05f 0%, #e8c589 var(--val,100%), rgba(255,255,255,.16) var(--val,100%));
+      outline: none;
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .12s ease;
+    }
+    .fold-ctrl input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 8px rgba(201,160,95,0.20), 0 4px 12px rgba(0,0,0,0.55);
+    }
+    .fold-ctrl input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff 0%, #f4e6cd 40%, #d9b374 100%);
+      border: 1.5px solid #c9a05f;
+      box-shadow: 0 0 0 5px rgba(201,160,95,0.14), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    .fold-ctrl input[type="range"]::-moz-range-track {
+      height: 4px; border-radius: 999px; background: transparent;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette ---------- */
+    const WHITE = "#f6f5f2";
+    const BLUE  = "#29abe2";     // the bright cyan blue from the Mozaik logo / reference photo
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("mozaik-logo-colored.png not found"); init(null); };
+    logoImg.src = "assets/mozaik-logo-colored.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 3.4, 9.6);
+      camera.lookAt(0, 0.1, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.62));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* SOFT paper grain */
+      function paperGrain(x, w, h, strength) {
+        const s = (strength == null ? 1 : strength) * 0.5;
+        for (let i = 0; i < w * h / 900; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.07 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.05 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.4 + Math.random() * 1.4, 1.4 + Math.random() * 1.4);
+        }
+        for (let i = 0; i < 22; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 40 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.03 * s) + ")" : "rgba(255,255,255," + (0.035 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 18;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(3, 3);
+        return t;
+      })();
+
+      function plainPanel(w, h, base, strength) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        x.fillStyle = base;
+        x.fillRect(0, 0, w, h);
+        paperGrain(x, w, h, strength == null ? 1 : strength);
+        return toTexture(c);
+      }
+
+      /* white panel + the Mozaik logo rotated 90° (PORTRAIT / vertical lockup),
+         centered — so the logo runs along the LENGTH of the sleeve top */
+      function logoPanelVertical(wPx, hPx, frac) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, wPx, hPx);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;   // ~0.35 (landscape)
+          // after a -90° rotation the logo's WIDTH runs vertically:
+          const lw = Math.round(hPx * frac);        // original width → vertical extent
+          const lh = Math.round(lw * ratio);        // original height → horizontal extent
+          x.save();
+          x.translate(wPx / 2, hPx / 2);
+          x.rotate(-Math.PI / 2);
+          x.drawImage(logo, -lw / 2, -lh / 2, lw, lh);
+          x.restore();
+        }
+        paperGrain(x, wPx, hPx, 0.4);
+        return toTexture(c);
+      }
+
+      const cardMat = (map) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.84, bumpMap: bumpTex, bumpScale: 0.01, side: THREE.DoubleSide
+      });
+
+      /* =========================================================
+         GEOMETRY — SLIDING DRAWER BOX ("kayar / sürgülü kutu"):
+           · an OUTER SLEEVE — a white tube (top/bottom/left/right
+             panels, open on both ends) with the vertical Mozaik
+             logo printed on the top face
+           · an INNER DRAWER — a blue open-top tray (floor + 4 low
+             walls) that slides in and out of the sleeve
+           · real board THICKNESS (T) on every panel, like box 6
+           · slider = the drawer sliding OUT (open) ⇄ IN (closed)
+         ========================================================= */
+      const ST  = 0.015;                // SLEEVE board thickness (very thin white shell)
+      const DT  = 0.22;                 // DRAWER board thickness (thick visible rim ~3× — chunky border like the real product)
+      const SW  = 1.95, SH = 0.567, SL = 3.0;  // sleeve outer: width(x), height(y), length(z) — height reduced by 1/3
+      const CLR = 0.02;                 // side clearance between drawer and sleeve interior
+      const HGAP = 0.006;               // tiny top gap so the drawer just clears the sleeve roof
+
+      // drawer outer dimensions — the drawer fills the sleeve interior almost
+      // completely in HEIGHT so no black gap shows under the sleeve top
+      const DW  = SW - 2 * ST - 2 * CLR;
+      const DH  = SH - 2 * ST - HGAP;
+      const DL  = SL - 2 * ST;
+
+      const whiteTex   = plainPanel(1024, 1024, WHITE, 0.5);
+      const blueTex    = plainPanel(1024, 1024, BLUE, 0.32);
+      const topLogoTex = logoPanelVertical(560, 860, 0.62);   // portrait logo on the sleeve top
+
+      const wMat = () => cardMat(whiteTex);
+      const bMat = () => cardMat(blueTex);
+
+      /* faces order for BoxGeometry mats: [+x, -x, +y, -y, +z, -z] */
+      function boxMesh(w, h, d, mats) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
+      const boxGroup = new THREE.Group();
+
+      /* ---------- OUTER SLEEVE (white tube, open on ±z ends) ---------- */
+      const sleeve = new THREE.Group();
+      boxGroup.add(sleeve);
+
+      // top panel — white, vertical logo on the OUTER (+y) face
+      const topMats = [wMat(), wMat(), cardMat(topLogoTex), wMat(), wMat(), wMat()];
+      const topPanel = boxMesh(SW, ST, SL, topMats);
+      topPanel.position.set(0, SH / 2 - ST / 2, 0);
+      sleeve.add(topPanel);
+
+      // bottom panel — white
+      const botPanel = boxMesh(SW, ST, SL, [wMat(), wMat(), wMat(), wMat(), wMat(), wMat()]);
+      botPanel.position.set(0, -SH / 2 + ST / 2, 0);
+      sleeve.add(botPanel);
+
+      // left + right panels — white (height spans between top & bottom panels)
+      const sideH = SH - 2 * ST;
+      const leftPanel = boxMesh(ST, sideH, SL, [wMat(), wMat(), wMat(), wMat(), wMat(), wMat()]);
+      leftPanel.position.set(-SW / 2 + ST / 2, 0, 0);
+      sleeve.add(leftPanel);
+
+      const rightPanel = boxMesh(ST, sideH, SL, [wMat(), wMat(), wMat(), wMat(), wMat(), wMat()]);
+      rightPanel.position.set(SW / 2 - ST / 2, 0, 0);
+      sleeve.add(rightPanel);
+
+      /* ---------- INNER DRAWER (blue open-top tray) ----------
+         built with its floor bottom at local y = 0, then seated on the
+         sleeve interior floor via drawer.position.y */
+      const drawer = new THREE.Group();
+      boxGroup.add(drawer);
+
+      // floor — THIN (same thin board as the white sleeve), only the walls stay thick
+      const dFloor = boxMesh(DW, ST, DL, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dFloor.position.set(0, ST / 2, 0);
+      drawer.add(dFloor);
+
+      // front (+z) & back (-z) walls — the front is the visible "push" face
+      const dFront = boxMesh(DW, DH, DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dFront.position.set(0, DH / 2, DL / 2 - DT / 2);
+      drawer.add(dFront);
+
+      const dBack = boxMesh(DW, DH, DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dBack.position.set(0, DH / 2, -DL / 2 + DT / 2);
+      drawer.add(dBack);
+
+      // left (-x) & right (+x) walls
+      const dLeft = boxMesh(DT, DH, DL - 2 * DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dLeft.position.set(-DW / 2 + DT / 2, DH / 2, 0);
+      drawer.add(dLeft);
+
+      const dRight = boxMesh(DT, DH, DL - 2 * DT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
+      dRight.position.set(DW / 2 - DT / 2, DH / 2, 0);
+      drawer.add(dRight);
+
+      // dark line along the BOTTOM INNER corner of the drawer walls (where the
+      // walls meet the floor) — same base line as before, just DARKER and a
+      // touch thicker (rendered as a very short strip so it reads slightly bold)
+      {
+        const ix = DW / 2 - DT, iz = DL / 2 - DT;
+        const e = 0.003;                 // inset off the inner wall face (avoid z-fight)
+        const y0 = ST + 0.001, y1 = ST + 0.01;   // thin line (half thickness)
+        const lnMat = new THREE.MeshBasicMaterial({ color: 0x101215, side: THREE.DoubleSide });
+        function strip(a, b, c, d) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute([
+            a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2], d[0],d[1],d[2]
+          ], 3));
+          g.setIndex([0,1,2, 0,2,3]);
+          drawer.add(new THREE.Mesh(g, lnMat));
+        }
+        strip([-ix+e, y0, -iz], [-ix+e, y0, iz], [-ix+e, y1, iz], [-ix+e, y1, -iz]);   // left inner
+        strip([ ix-e, y0, -iz], [ ix-e, y0, iz], [ ix-e, y1, iz], [ ix-e, y1, -iz]);    // right inner
+        strip([-ix, y0, iz-e], [ ix, y0, iz-e], [ ix, y1, iz-e], [-ix, y1, iz-e]);      // front inner
+        strip([-ix, y0, -iz+e], [ ix, y0, -iz+e], [ ix, y1, -iz+e], [-ix, y1, -iz+e]);  // back inner
+      }
+
+      // VERTICAL dark lines cutting each inner corner along its full length
+      // (top → bottom), connecting to the base line — reads as the corner seam
+      {
+        const ix = DW / 2 - DT, iz = DL / 2 - DT;
+        const w = 0.01;                  // corner chamfer width (line thickness — half)
+        const y0 = ST + 0.001, y1 = DH;  // from the base line up to the top rim
+        const lnMat = new THREE.MeshBasicMaterial({ color: 0x101215, side: THREE.DoubleSide });
+        function strip(a, b, c, d) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute("position", new THREE.Float32BufferAttribute([
+            a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2], d[0],d[1],d[2]
+          ], 3));
+          g.setIndex([0,1,2, 0,2,3]);
+          drawer.add(new THREE.Mesh(g, lnMat));
+        }
+        const ty = DH + 0.001, hw = 0.0035;  // top-rim cap: y just above the rim, half-width (half)
+        [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => {
+          // vertical line down the inner corner
+          const p1 = [sx * ix,        y0, sz * (iz - w)];
+          const p2 = [sx * (ix - w),  y0, sz * iz];
+          const p3 = [sx * (ix - w),  y1, sz * iz];
+          const p4 = [sx * ix,        y1, sz * (iz - w)];
+          strip(p1, p2, p3, p4);
+          // continue the line ACROSS the top rim (inner corner → outer corner)
+          // so it wraps over the top edge and is visible from above
+          const inr = [sx * ix,       sz * iz];
+          const out = [sx * DW / 2,   sz * DL / 2];
+          strip(
+            [inr[0] - sz * hw, ty, inr[1] + sx * hw],
+            [inr[0] + sz * hw, ty, inr[1] - sx * hw],
+            [out[0] + sz * hw, ty, out[1] - sx * hw],
+            [out[0] - sz * hw, ty, out[1] + sx * hw]
+          );
+        }));
+      }
+
+      // seat the drawer on the sleeve interior floor
+      const drawerBaseY = -SH / 2 + ST;
+      drawer.position.y = drawerBaseY;
+
+      scene.add(boxGroup);
+
+      /* ---------- soft ground shadow ---------- */
+      const groundY = -SH / 2 - 0.001;
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.28 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = groundY;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 0 = drawer OUT (open), 1 = drawer IN (closed) ---------- */
+      const SLIDE = SL * 0.66;          // how far the drawer slides out
+      let foldTarget = 0, fold = 0;
+      function applyFold(t) {
+        drawer.position.z = SLIDE * (1 - t);   // slides toward +z as it opens
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.32, y: Math.PI / 7 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const dd = camera.position.length();
+        if (dd < 5.0) camera.position.setLength(5.0);
+        if (dd > 18)  camera.position.setLength(18);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const dd = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - dd) * 0.004);
+          pinchDist = dd;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, sleeve, drawer, camera, scene,
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ sliding drawer box ready");
+    }
+  </script>
+</body>
+</html>

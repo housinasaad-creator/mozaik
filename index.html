@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="tr" dir="ltr" translate="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="google" content="notranslate" />
+  <title>Mozaik Ofset ve Ambalaj — Premium Baskı & Ambalaj</title>
+  <meta name="description" content="Mozaik Ofset ve Ambalaj — Ofset baskı, kutu, karton, etiket ve özel ambalaj çözümleri. BRC gıda sertifikalı. Gaziantep." />
+  <link rel="icon" type="image/png" href="assets/mozaik-logo-colored.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css?v=3" />
+</head>
+<body>
+
+  <!-- Spotlight mosaic reveal -->
+  <div class="reveal-bg" aria-hidden="true"></div>
+  <div class="reveal-shroud" id="shroud" aria-hidden="true"></div>
+  <canvas class="dots-fx" aria-hidden="true"></canvas>
+
+  <!-- Custom cursor -->
+  <div class="cursor" id="cursorDot" aria-hidden="true"></div>
+  <div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+  <!-- Navbar -->
+  <header class="nav" id="nav">
+    <div class="container nav__inner">
+      <a href="#hero" class="brand" data-cursor="link" aria-label="Mozaik Ofset ve Ambalaj">
+        <img src="assets/mozaik-logo-colored.png" alt="Mozaik Ofset ve Ambalaj" class="brand__mark" />
+      </a>
+
+      <nav class="nav__links" id="navLinks">
+        <a href="#about"    data-i18n="nav.about">Kurumsal</a>
+        <a href="#products" data-i18n="nav.products">Ürünler</a>
+        <a href="#quality"  data-i18n="nav.quality">Kalite</a>
+        <a href="#services" data-i18n="nav.services">Hizmetler</a>
+        <a href="#location" data-i18n="nav.contact">İletişim</a>
+        <a href="journey.html" data-i18n="nav.journey">Başarı Yolculuğu</a>
+        <a href="production.html" data-i18n="nav.production">Üretim Hattı</a>
+      </nav>
+
+      <div class="nav__actions">
+        <div class="nav__social" aria-label="İletişim">
+          <a href="tel:+903425037773" data-cursor="link" aria-label="Telefon" title="+90 342 503 77 73">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </a>
+          <a href="https://wa.me/905321753400" target="_blank" rel="noopener" data-cursor="link" aria-label="WhatsApp" title="WhatsApp">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+          </a>
+          <a href="https://www.facebook.com/share/16Y3u3c4zB/" target="_blank" rel="noopener" data-cursor="link" aria-label="Facebook" title="Facebook">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          </a>
+          <a href="https://www.instagram.com/mozaikofset" target="_blank" rel="noopener" data-cursor="link" aria-label="Instagram" title="Instagram">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          </a>
+        </div>
+        <div class="lang lang--inline" id="lang" role="group" aria-label="Language">
+          <button type="button" data-lang="tr" data-cursor="link">TR</button>
+          <button type="button" data-lang="en" data-cursor="link">EN</button>
+          <button type="button" data-lang="ar" data-cursor="link">AR</button>
+        </div>
+        <button class="nav__toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero" id="hero">
+      <!-- Real production footage; fades out gradually toward the bottom -->
+      <div class="hero__bg" aria-hidden="true">
+        <video class="hero__bg-video" autoplay muted loop playsinline preload="auto" poster="assets/hero-poster.jpg">
+          <source src="assets/hero.mp4" type="video/mp4" />
+        </video>
+        <div class="hero__bg-veil"></div>
+        <div class="hero__beam"></div>
+      </div>
+      <div class="container hero__inner">
+        <div class="hero__copy">
+          <div class="hero__logo reveal">
+            <div class="hero__logo-glow"></div>
+            <img src="assets/mozaik-logo-colored.png" alt="Mozaik Ofset ve Ambalaj" class="hero__logo-mark" />
+          </div>
+          <h1 class="hero__title reveal" data-i18n-html="hero.title">
+            Markanızı <span class="grad">ışıldayan</span><br /> ambalajlarla hayata geçiriyoruz.
+          </h1>
+          <div class="hero__actions reveal">
+            <a href="#products" class="btn btn--ghost btn--lg" data-magnetic data-cursor="link" data-i18n="hero.cta2">Ürünleri Keşfet</a>
+          </div>
+          <div class="hero__stats reveal">
+            <div class="stat"><b data-count="10" data-suffix="+">0</b><span data-i18n="hero.stat1">Yıllık tecrübe</span></div>
+            <div class="stat"><b data-count="1200">0</b><span data-i18n="hero.stat2">Tamamlanan proje</span></div>
+            <div class="stat"><b data-count="98" data-suffix="%">0</b><span data-i18n="hero.stat3">Memnuniyet</span></div>
+          </div>
+        </div>
+      </div>
+      <a href="#about" class="scroll-cue" aria-hidden="true"><span></span></a>
+    </section>
+
+    <!-- About -->
+    <section class="section about" id="about">
+      <div class="container about__grid">
+        <div class="about__head reveal">
+          <span class="kicker" data-i18n="about.kicker">Kurumsal</span>
+          <h2 class="section-title" data-i18n-html="about.title">Bir mozaiğin her parçası gibi, <span class="grad">her detay önemli.</span></h2>
+        </div>
+        <div class="about__body reveal">
+          <p data-i18n-html="about.body">
+            2018 yılında kurulan <strong>Mozaik Ofset ve Ambalaj</strong>, "özveri ve başarı"
+            ilkesiyle yola çıktı. Modern baskı teknolojisi ve deneyimli ekibimizle markaların
+            ambalaj ihtiyaçlarına yüksek kaliteli çözümler sunuyoruz.
+          </p>
+          <p data-i18n-html="about.body2">
+            From concept and structural design to printing, die-cutting and finishing, everything
+            happens under one roof — giving you tighter control, faster turnaround and consistent
+            quality on every run.
+          </p>
+          <ul class="checks">
+            <li data-i18n="about.c1">Hassas renk yönetimi ve baskı kalitesi</li>
+            <li data-i18n="about.c2">Kısa üretim süreleri, zamanında teslimat</li>
+            <li data-i18n="about.c3">Özel tasarım kutu ve ambalaj mühendisliği</li>
+            <li data-i18n="about.c4">Food-safe, BRC-certified production</li>
+            <li data-i18n="about.c5">Free technical consultation before printing</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Products: bigger stacking cards (text on top, media below) -->
+    <section class="section products" id="products">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="kicker" data-i18n="products.kicker">Ürünler</span>
+          <h2 class="section-title" data-i18n-html="products.title">Kaydırdıkça <span class="grad">açılan</span> koleksiyon</h2>
+          <p class="section-sub" data-i18n="products.sub">Her ürün, gerçek Mozaik baskı ve ambalaj işlerinden — video ve 3B görünümle.</p>
+        </div>
+      </div>
+
+      <div class="pcarousel" id="pcar">
+        <div class="pcarousel__viewport">
+          <div class="stack pcarousel__track" id="stack">
+          <article class="stack__card">
+            <div class="glass pcard">
+              <header class="pcard__head">
+                <span class="pcard__num">01</span>
+                <div class="pcard__titles">
+                  <h3 data-i18n="box2.t">Cardboard Boxes (Folding Carton)</h3>
+                  <p data-i18n="box2.d">Classic folding cartons — printed, creased and shipped flat for efficiency.</p>
+                </div>
+              </header>
+              <div class="pcard__media">
+                <div class="media-stage">
+                  <div class="media-glow"></div>
+                  <div class="media-view media-view--3d"><iframe data-src="boxes/2/box-viewer.html" title="Cardboard Boxes (Folding Carton)" class="media-iframe" loading="lazy" allowfullscreen></iframe></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article class="stack__card">
+            <div class="glass pcard">
+              <header class="pcard__head">
+                <span class="pcard__num">02</span>
+                <div class="pcard__titles">
+                  <h3 data-i18n="box5.t">Crash-Lock Bottom Folding Carton</h3>
+                  <p data-i18n="box5.d">Auto-lock bottom that snaps into shape when opened — fast to set up, load-bearing.</p>
+                </div>
+              </header>
+              <div class="pcard__media">
+                <div class="media-stage">
+                  <div class="media-glow"></div>
+                  <div class="media-view media-view--3d"><iframe data-src="boxes/5/box-viewer.html?v=3" title="Crash-Lock Bottom Folding Carton" class="media-iframe" loading="lazy" allowfullscreen></iframe></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article class="stack__card">
+            <div class="glass pcard">
+              <header class="pcard__head">
+                <span class="pcard__num">03</span>
+                <div class="pcard__titles">
+                  <h3 data-i18n="box11.t">Telescope-Type Boxes</h3>
+                  <p data-i18n="box11.d">Two-piece lid-and-base boxes that telescope together for a premium unboxing.</p>
+                </div>
+              </header>
+              <div class="pcard__media">
+                <div class="media-stage">
+                  <div class="media-glow"></div>
+                  <div class="media-view media-view--3d"><iframe data-src="boxes/11/box-viewer.html" title="Telescope-Type Boxes" class="media-iframe" loading="lazy" allowfullscreen></iframe></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article class="stack__card">
+            <div class="glass pcard">
+              <header class="pcard__head">
+                <span class="pcard__num">04</span>
+                <div class="pcard__titles">
+                  <h3 data-i18n="box13.t">Window-Patched Boxes</h3>
+                  <p data-i18n="box13.d">Cartons with a clear film window so the product is visible on the shelf.</p>
+                </div>
+              </header>
+              <div class="pcard__media">
+                <div class="media-stage">
+                  <div class="media-glow"></div>
+                  <div class="media-view media-view--3d"><iframe data-src="boxes/13/box-viewer.html" title="Window-Patched Boxes" class="media-iframe" loading="lazy" allowfullscreen></iframe></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article class="stack__card">
+            <div class="glass pcard">
+              <header class="pcard__head">
+                <span class="pcard__num">05</span>
+                <div class="pcard__titles">
+                  <h3 data-i18n="box14.t">Spot UV Boxes</h3>
+                  <p data-i18n="box14.d">Selective glossy UV coating over matte — tactile contrast and premium finish.</p>
+                </div>
+              </header>
+              <div class="pcard__media">
+                <div class="media-stage">
+                  <div class="media-glow"></div>
+                  <div class="media-view media-view--3d"><iframe data-src="boxes/14/box-viewer.html" title="Spot UV Boxes" class="media-iframe" loading="lazy" allowfullscreen></iframe></div>
+                </div>
+              </div>
+            </div>
+          </article>
+          </div>
+        </div>
+
+        <div class="pcarousel__ctrl">
+          <button class="pcar-btn pcar-prev" id="pcarPrev" data-cursor="link" aria-label="Önceki">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="pcarousel__meta">
+            <div class="pcarousel__count"><b id="pcarCur">01</b><i>/</i><span id="pcarTot">05</span></div>
+            <div class="pcarousel__dots" id="pcarDots" role="tablist"></div>
+          </div>
+          <button class="pcar-btn pcar-next" id="pcarNext" data-cursor="link" aria-label="Sonraki">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="container products-more reveal">
+        <a href="catalog.html" class="btn btn--cta btn--lg" data-magnetic data-cursor="cta" data-i18n="products.viewall">View the catalogue</a>
+      </div>
+    </section>
+
+    <!-- Quality & Certifications -->
+    <section class="section quality" id="quality">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="kicker" data-i18n="quality.kicker">Kalite & Sertifika</span>
+          <h2 class="section-title" data-i18n-html="quality.title">Gıdaya uygun, <span class="grad">BRC sertifikalı</span> üretim</h2>
+          <p class="section-sub" data-i18n="quality.sub">Ambalajlarımız, gıda güvenliği için uluslararası standartlarda üretilir.</p>
+        </div>
+        <ul class="certs">
+          <li class="cert glass reveal cert--primary" data-tilt data-cursor="link">
+            <span class="cert__mark" translate="no">BRC</span>
+            <div><h3 data-i18n="cert.brc.t">BRC Gıda Güvenliği</h3>
+              <p data-i18n="cert.brc.d">Gıdayla temas eden ambalajlar için uluslararası BRC standardı.</p></div>
+            <span class="cert__preview"><img src="assets/certs/brc.svg" alt="BRC certificate preview (sample)" loading="lazy" /></span>
+          </li>
+          <li class="cert glass reveal" data-tilt data-cursor="link">
+            <span class="cert__mark" translate="no">ISO</span>
+            <div><h3 data-i18n="cert.iso.t">ISO 9001</h3>
+              <p data-i18n="cert.iso.d">Kalite yönetim sistemi ile tutarlı ve izlenebilir üretim.</p></div>
+            <span class="cert__preview"><img src="assets/certs/iso.svg" alt="ISO 9001 certificate preview (sample)" loading="lazy" /></span>
+          </li>
+          <li class="cert glass reveal" data-tilt data-cursor="link">
+            <span class="cert__mark" translate="no">FSC</span>
+            <div><h3 data-i18n="cert.fsc.t">Sürdürülebilir Kağıt</h3>
+              <p data-i18n="cert.fsc.d">Sorumlu kaynaklı, çevre dostu kağıt ve karton seçenekleri.</p></div>
+            <span class="cert__preview"><img src="assets/certs/fsc.svg" alt="FSC certificate preview (sample)" loading="lazy" /></span>
+          </li>
+          <li class="cert glass reveal" data-tilt data-cursor="link">
+            <span class="cert__mark">✓</span>
+            <div><h3 data-i18n="cert.food.t">Gıdaya Uygun Mürekkep</h3>
+              <p data-i18n="cert.food.d">Düşük göç riskli, gıdaya uygun mürekkep ve laklarla baskı.</p></div>
+            <span class="cert__preview"><img src="assets/certs/food.svg" alt="Food-safe certificate preview (sample)" loading="lazy" /></span>
+          </li>
+        </ul>
+        <p class="section-note reveal" data-i18n="quality.note">From selecting food-contact materials to printing and finishing, we uphold international safety standards at every step — so your packaging reaches the consumer with full confidence. All our inks and coatings are low-migration and food-contact safe.</p>
+      </div>
+    </section>
+
+    <!-- Services -->
+    <section class="section services" id="services">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="kicker" data-i18n="services.kicker">Hizmetler</span>
+          <h2 class="section-title" data-i18n-html="services.title">Uçtan uca <span class="grad">baskı & ambalaj</span></h2>
+        </div>
+        <div class="cards">
+          <div class="card glass reveal" data-tilt data-cursor="link"><div class="card__ico">✦</div>
+            <h3 data-i18n="s1.t">Tasarım & Prova</h3><p data-i18n="s1.d">Grafik tasarım, dijital prova ve renk kalibrasyonu.</p><span class="card__preview"><img src="assets/services/design.jpg" alt="Design & Proof (sample)" loading="lazy" /></span></div>
+          <div class="card glass reveal" data-tilt data-cursor="link"><div class="card__ico">◈</div>
+            <h3 data-i18n="s2.t">Baskı Üretimi</h3><p data-i18n="s2.d">Ofset ve dijital baskı ile her tirajda esneklik.</p><span class="card__preview"><img src="assets/services/print.jpg" alt="Print Production (sample)" loading="lazy" /></span></div>
+          <div class="card glass reveal" data-tilt data-cursor="link"><div class="card__ico">❖</div>
+            <h3 data-i18n="s3.t">Kesim & Bitirme</h3><p data-i18n="s3.d">Bıçak kalıbı, gofraj ve yaldız uygulamaları.</p><span class="card__preview"><img src="assets/services/cut.jpg" alt="Cutting & Finishing (sample)" loading="lazy" /></span></div>
+          <div class="card glass reveal" data-tilt data-cursor="link"><div class="card__ico">▲</div>
+            <h3 data-i18n="s4.t">Lojistik & Teslimat</h3><p data-i18n="s4.d">Planlı üretim ve güvenli, zamanında sevkiyat.</p><span class="card__preview"><img src="assets/services/logistics.jpg" alt="Logistics & Delivery (sample)" loading="lazy" /></span></div>
+        </div>
+        <p class="section-note reveal" data-i18n="services.note">We don't just fulfill the order — we sit with each client to understand the challenge: shipping cost, packaging strength, or speeding up production, and propose the best solution. Many clients have saved time and money thanks to a simple technical consultation before printing.</p>
+      </div>
+    </section>
+
+    <!-- Testimonials -->
+    <!-- Clients / trusted brands (placeholder logos — swap for real client logos) -->
+    <section class="section clients" id="testimonials">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="kicker" data-i18n="clients.kicker">Müşterilerimiz</span>
+          <h2 class="section-title" data-i18n-html="clients.title">Bize <span class="grad">güvenen</span> markalar</h2>
+          <p class="section-sub" data-i18n="clients.sub">Dünyanın dört bir yanından markalar Mozaik'e güveniyor.</p>
+        </div>
+        <ul class="clients-grid reveal">
+          <li class="client glass reveal" data-tilt data-cursor="link" aria-label="Novara"><svg viewBox="0 0 210 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M30 8 40 30 30 52 20 30Z" fill="#ff6a3d"/><path d="M30 18 35 30 30 42 25 30Z" fill="#ec297a"/><text x="54" y="39" font-family="Sora,system-ui,sans-serif" font-weight="700" font-size="23" letter-spacing="1" fill="#f0ede4">Novara</text></svg></li>
+          <li class="client glass reveal" data-tilt data-cursor="link" aria-label="Azure"><svg viewBox="0 0 210 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="28" cy="30" r="15" fill="none" stroke="#29a9e2" stroke-width="5"/><circle cx="28" cy="30" r="6" fill="#7fd0f2"/><text x="52" y="39" font-family="Sora,system-ui,sans-serif" font-weight="700" font-size="23" letter-spacing="1" fill="#f0ede4">Azure</text></svg></li>
+          <li class="client glass reveal" data-tilt data-cursor="link" aria-label="Verdé"><svg viewBox="0 0 210 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polygon points="28,7 45,17 45,43 28,53 11,43 11,17" fill="#3fae54"/><path d="M21 30 27 36 36 23" stroke="#0a1530" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="56" y="39" font-family="Sora,system-ui,sans-serif" font-weight="700" font-size="23" letter-spacing="1" fill="#f0ede4">Verd&#233;</text></svg></li>
+          <li class="client glass reveal" data-tilt data-cursor="link" aria-label="Lumen"><svg viewBox="0 0 210 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="28" cy="30" r="11" fill="#f5a623"/><g stroke="#f5a623" stroke-width="3" stroke-linecap="round"><line x1="28" y1="6" x2="28" y2="13"/><line x1="28" y1="47" x2="28" y2="54"/><line x1="4" y1="30" x2="11" y2="30"/><line x1="45" y1="30" x2="52" y2="30"/><line x1="11" y1="13" x2="16" y2="18"/><line x1="40" y1="42" x2="45" y2="47"/><line x1="45" y1="13" x2="40" y2="18"/><line x1="16" y1="42" x2="11" y2="47"/></g><text x="60" y="39" font-family="Sora,system-ui,sans-serif" font-weight="700" font-size="23" letter-spacing="1" fill="#f0ede4">Lumen</text></svg></li>
+        </ul>
+        <p class="section-note reveal" data-i18n="clients.note">From startups to global brands, our clients choose Mozaik because they want a partner who understands that packaging is the first touch between their product and the customer. We work as an extension of their team — meeting deadlines, protecting quality, and keeping every design confidential. We don't measure our relationships by the number of orders, but by the trust that grows with each project — and that is what we are proudest of.</p>
+      </div>
+    </section>
+
+        <section class="section location" id="location">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="kicker" data-i18n="location.kicker">İletişim</span>
+          <h2 class="section-title" data-i18n-html="location.title">Konumumuza <span class="grad">göz atın</span></h2>
+          <p class="section-sub" data-i18n="location.sub">Mozaik Ofset ve Ambalaj — Gaziantep'te üretim tesisimiz.</p>
+        </div>
+
+        <p class="section-note reveal" data-i18n-html="location.note">Our door is always open — whether you have a ready design or just a question. Call us or reach out on WhatsApp, tell us about your product, its size and quantity, and our technical team will give you a <strong>free consultation</strong> and the best-fit solution before you start.</p>
+
+        <div class="location__grid">
+          <div class="location__map glass reveal">
+            <div id="map" class="map"></div>
+            <div class="location__addr">
+              <span class="location__pin"></span>
+              <div translate="no">
+                <strong>Mozaik Ofset İhracat İthalat San. Ltd. Şti.</strong>
+                <span>Başpınar (Organize) OSB Mah. 2.Bölge, 83227 No'lu Cad. No:15, 27600 Şehitkamil / Gaziantep</span>
+              </div>
+              <a class="mini-link" id="mapDir" href="https://www.google.com/maps/search/?api=1&query=37.167621,37.304813" target="_blank" rel="noopener" data-i18n="location.dir" data-cursor="link">Yol tarifi →</a>
+            </div>
+          </div>
+
+          <div class="location__cards reveal">
+            <a href="tel:+903425037773" class="infocard glass" data-tilt data-cursor="link">
+              <span class="infocard__ico">✆</span>
+              <div><span class="infocard__k" data-i18n="contact.k.phone">Sabit Hat</span>
+                <b class="infocard__v" translate="no">+90 342 503 77 73</b></div>
+            </a>
+            <a href="https://wa.me/905321753400" target="_blank" rel="noopener" class="infocard glass" data-tilt data-cursor="link">
+              <span class="infocard__ico">◍</span>
+              <div><span class="infocard__k" data-i18n="contact.k.mobile">WhatsApp / GSM</span>
+                <b class="infocard__v" translate="no">+90 532 175 34 00</b></div>
+            </a>
+            <a href="mailto:info@mozaikofset.com.tr" class="infocard glass" data-tilt data-cursor="link">
+              <span class="infocard__ico">✉</span>
+              <div><span class="infocard__k" data-i18n="contact.k.email">E-posta</span>
+                <b class="infocard__v" translate="no">info@mozaikofset.com.tr</b></div>
+            </a>
+            <div class="infocard glass" data-tilt>
+              <span class="infocard__ico">◷</span>
+              <div><span class="infocard__k" data-i18n="contact.k.hours">Çalışma Saatleri</span>
+                <b class="infocard__v" data-i18n="contact.v.hours">Pzt – Cmt · 08:30 – 18:30</b></div>
+            </div>
+            <div class="socials">
+              <a href="https://www.instagram.com/mozaikofset" target="_blank" rel="noopener" data-magnetic data-cursor="link" translate="no">Instagram</a>
+              <a href="https://www.facebook.com/share/16Y3u3c4zB/" target="_blank" rel="noopener" data-magnetic data-cursor="link" translate="no">Facebook</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="cta-band__inner glass reveal">
+          <div>
+            <h2 data-i18n-html="ctaband.title">Projeniz için <span class="grad">özel teklif</span> alın</h2>
+            <p data-i18n="ctaband.sub">Ölçü ve adediyle paylaşın; en kısa sürede fiyatlandıralım.</p>
+          </div>
+          <button type="button" class="btn btn--cta btn--lg" data-quote-open data-magnetic data-cursor="cta" data-i18n="cta.quote">Teklif Al</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <img src="assets/mozaik-logo-colored.png" alt="Mozaik Ofset ve Ambalaj" />
+        <div class="footer__brandtxt">
+          <p data-i18n-html="footer.addr">Mozaik Ofset ve Ambalaj San. Tic. Ltd. Şti.<br />Gaziantep · Türkiye</p>
+        </div>
+      </div>
+      <nav class="footer__nav">
+        <a href="#about"    data-i18n="nav.about"    data-cursor="link">Kurumsal</a>
+        <a href="#products" data-i18n="nav.products" data-cursor="link">Ürünler</a>
+        <a href="#quality"  data-i18n="nav.quality"  data-cursor="link">Kalite</a>
+        <a href="#services" data-i18n="nav.services" data-cursor="link">Hizmetler</a>
+        <a href="#location" data-i18n="nav.contact"  data-cursor="link">İletişim</a>
+        <a href="journey.html"    data-i18n="nav.journey"    data-cursor="link">Başarı Yolculuğu</a>
+        <a href="production.html" data-i18n="nav.production" data-cursor="link">Üretim Hattı</a>
+      </nav>
+    </div>
+    <div class="container footer__bar">
+      <span data-i18n-html="footer.copy">© <b id="year"></b> Mozaik Ofset ve Ambalaj. Tüm hakları saklıdır.</span>
+      <span data-i18n="footer.tag">Premium Baskı & Ambalaj</span>
+    </div>
+  </footer>
+
+  <!-- Quote request modal → opens WhatsApp with a ready message -->
+  <div class="modal" id="quoteModal" aria-hidden="true">
+    <div class="modal__backdrop" data-quote-close></div>
+    <div class="modal__box glass" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
+      <button class="modal__close" type="button" data-quote-close aria-label="Close">&times;</button>
+      <span class="kicker" data-i18n="quote.kicker">Get a Quote</span>
+      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Request a quote</h3>
+      <p class="modal__sub" data-i18n="quote.sub">Share a few details and we'll reply fast on WhatsApp.</p>
+      <form id="quoteForm" class="qform">
+        <div class="qform__row">
+          <label class="qform__field"><span data-i18n="quote.name">Name</span><input type="text" name="name" required /></label>
+          <label class="qform__field"><span data-i18n="quote.company">Company (optional)</span><input type="text" name="company" /></label>
+        </div>
+        <div class="qform__row">
+          <label class="qform__field"><span data-i18n="quote.phone">Phone (optional)</span><input type="text" name="phone" /></label>
+          <label class="qform__field"><span data-i18n="quote.ptype">Product type</span>
+            <select name="ptype">
+              <option data-i18n="quote.opt.folding">Folding carton</option>
+              <option data-i18n="quote.opt.corrugated">Corrugated box</option>
+              <option data-i18n="quote.opt.rigid">Rigid / telescope box</option>
+              <option data-i18n="quote.opt.window">Window box</option>
+              <option data-i18n="quote.opt.label">Label</option>
+              <option data-i18n="quote.opt.finish">Finishing (UV / foil)</option>
+              <option data-i18n="quote.opt.other">Other</option>
+            </select>
+          </label>
+        </div>
+        <div class="qform__row">
+          <label class="qform__field"><span data-i18n="quote.dims">Dimensions</span><input type="text" name="dims" placeholder="L × W × H" /></label>
+          <label class="qform__field"><span data-i18n="quote.qty">Quantity</span><input type="text" name="qty" inputmode="numeric" /></label>
+        </div>
+        <label class="qform__field"><span data-i18n="quote.notes">Notes</span><textarea name="notes" rows="3"></textarea></label>
+        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">Send on WhatsApp</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/i18n.js?v=3"></script>
+  <script src="js/main.js?v=3"></script>
+</body>
+</html>

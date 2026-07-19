@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    html, body { touch-action: none; overscroll-behavior: none; }
+    body {
+      background: #0a0a0c;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      cursor: grab;
+    }
+    body.grabbing { cursor: grabbing; }
+    canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .info {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a05f;
+      font-size: 0.8rem;
+      text-align: center;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: .02em;
+    }
+  </style>
+</head>
+<body>
+  <div class="info">Döndürmek için sürükleyin • Zoom için tekerlek / iki parmakla sıkıştırın</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette: navy + white (per client) ---------- */
+    const NAVY  = "#1b2740";
+    const WHITE = "#f6f5f2";
+
+    const logoImg = new Image();
+    logoImg.onload  = () => init(logoImg);
+    logoImg.onerror = () => { console.warn("logo-mark.png not found"); init(null); };
+    logoImg.src = "assets/logo-mark.png";
+
+    function init(logo) {
+      console.log("init, logo:", logo ? logo.naturalWidth + "x" + logo.naturalHeight : "none");
+
+      /* ---------- renderer (clean, no studio processing) ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0c);
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 3.0, 7.0);
+      camera.lookAt(0, 0, 0);
+
+      /* fit renderer/camera to the ACTUAL rendered box of this document —
+         robust for iframe embeds where layout can settle after first paint
+         (a plain window "resize" listener misses that on mobile) */
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- simple soft lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33333a, 0.6));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.42);
+      key.position.set(4, 8, 5);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+      key.shadow.camera.left = key.shadow.camera.bottom = -8;
+      key.shadow.camera.right = key.shadow.camera.top = 8;
+      key.shadow.bias = -0.0004;
+      key.shadow.radius = 7;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xffffff, 0.18);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      /* paper fiber grain drawn over any face (the "touch of paper") */
+      function paperGrain(x, w, h, strength) {
+        const s = strength || 1;
+        // tiny speckles (paper dust / uncoated stock)
+        for (let i = 0; i < w * h / 550; i++) {
+          const light = Math.random() > 0.5;
+          x.fillStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.10 * s) + ")"
+            : "rgba(80,70,55,"   + (Math.random() * 0.08 * s) + ")";
+          x.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5 + Math.random() * 1.5);
+        }
+        // short pressed-in fibers, mostly horizontal (paper grain direction)
+        x.lineWidth = 1.4;
+        for (let i = 0; i < w * h / 2800; i++) {
+          const fx = Math.random() * w, fy = Math.random() * h;
+          const len = 4 + Math.random() * 12;
+          const ang = (Math.random() - 0.5) * 0.5;
+          const light = Math.random() > 0.45;
+          x.strokeStyle = light
+            ? "rgba(255,255,255," + (Math.random() * 0.09 * s) + ")"
+            : "rgba(90,80,60,"   + (Math.random() * 0.075 * s) + ")";
+          x.beginPath();
+          x.moveTo(fx, fy);
+          x.lineTo(fx + Math.cos(ang) * len, fy + Math.sin(ang) * len);
+          x.stroke();
+        }
+        // soft mottling (pulp unevenness) — reads as paper even from afar
+        for (let i = 0; i < 34; i++) {
+          const mx = Math.random() * w, my = Math.random() * h;
+          const mr = 30 + Math.random() * 90;
+          const g = x.createRadialGradient(mx, my, 0, mx, my, mr);
+          const dark = Math.random() > 0.5;
+          g.addColorStop(0, dark ? "rgba(60,55,45," + (0.045 * s) + ")" : "rgba(255,255,255," + (0.05 * s) + ")");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          x.fillStyle = g;
+          x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+        }
+      }
+
+      /* micro-relief bump map (paper tooth) shared by all faces */
+      const bumpTex = (function () {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = "#808080";
+        x.fillRect(0, 0, 512, 512);
+        const d = x.getImageData(0, 0, 512, 512);
+        for (let i = 0; i < d.data.length; i += 4) {
+          const n = 128 + (Math.random() - 0.5) * 30;
+          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
+        }
+        x.putImageData(d, 0, 0);
+        // faint horizontal fiber streaks in the relief too
+        for (let i = 0; i < 260; i++) {
+          x.strokeStyle = "rgba(" + (Math.random() > 0.5 ? "200,200,200" : "60,60,60") + ",0.08)";
+          const fy = Math.random() * 512, fx = Math.random() * 512;
+          x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx + 4 + Math.random() * 10, fy + (Math.random() - 0.5) * 2); x.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(4, 4);
+        return t;
+      })();
+
+      /* ---------- TOP CAP: white + colored logo + wordmark (like mockup) ---------- */
+      function topFace() {
+        const S = 1400;
+        const c = document.createElement("canvas");
+        c.width = c.height = S;
+        const x = c.getContext("2d");
+
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, S, S);
+
+        // gentle edge occlusion toward the hexagon rim
+        const rg = x.createRadialGradient(S/2, S/2, S*0.28, S/2, S/2, S*0.52);
+        rg.addColorStop(0, "rgba(0,0,0,0)");
+        rg.addColorStop(1, "rgba(0,0,0,0.06)");
+        x.fillStyle = rg;
+        x.fillRect(0, 0, S, S);
+
+        // colored mosaic logo — big, centered upper area
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(S * 0.30);
+          const lh = Math.round(lw * ratio);
+          x.shadowColor = "rgba(0,0,0,0.10)";
+          x.shadowBlur = 10;
+          x.shadowOffsetY = 3;
+          x.drawImage(logo, (S - lw) / 2, S * 0.135, lw, lh);
+          x.shadowColor = "transparent";
+        }
+
+        // MOZAIK wordmark (navy, wide tracking like the mockup)
+        x.fillStyle = "#24427c";
+        x.textAlign = "center";
+        x.textBaseline = "middle";
+        x.font = "700 150px 'Segoe UI', Arial, sans-serif";
+        x.fillText("MOZAİK", S / 2, S * 0.685);
+
+        // subtitle in warm red like the mockup
+        x.font = "600 52px 'Segoe UI', Arial, sans-serif";
+        x.fillStyle = "#c94b5a";
+        const sub = "O F S E T   &   A M B A L A J";
+        x.fillText(sub, S / 2, S * 0.795);
+
+        paperGrain(x, S, S, 1.1);
+        return toTexture(c);
+      }
+
+      /* ---------- LID SIDES: navy, wraps the 6 panels ---------- */
+      function lidSide() {
+        const c = document.createElement("canvas");
+        c.width = 1536; c.height = 320;
+        const x = c.getContext("2d");
+        x.fillStyle = NAVY;
+        x.fillRect(0, 0, c.width, c.height);
+
+        // top edge highlight (board thickness catching light)
+        let g = x.createLinearGradient(0, 0, 0, 22);
+        g.addColorStop(0, "rgba(255,255,255,0.16)");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        x.fillStyle = g;
+        x.fillRect(0, 0, c.width, 22);
+
+        // bottom edge of the lid: paper-thickness light line + shadow gap
+        x.fillStyle = "rgba(255,255,255,0.22)";
+        x.fillRect(0, c.height - 10, c.width, 4);
+        g = x.createLinearGradient(0, c.height - 34, 0, c.height - 10);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, "rgba(0,0,0,0.28)");
+        x.fillStyle = g;
+        x.fillRect(0, c.height - 34, c.width, 24);
+
+        paperGrain(x, c.width, c.height, 0.9);
+        return toTexture(c);
+      }
+
+      /* ---------- BASE SIDES: white, with the seam shadow under the lid ---------- */
+      function baseSide() {
+        const c = document.createElement("canvas");
+        c.width = 1536; c.height = 640;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, c.width, c.height);
+
+        // deep contact shadow right under the lid edge (the detail the client asked for)
+        let g = x.createLinearGradient(0, 0, 0, 90);
+        g.addColorStop(0, "rgba(0,0,0,0.30)");
+        g.addColorStop(0.4, "rgba(0,0,0,0.10)");
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        x.fillStyle = g;
+        x.fillRect(0, 0, c.width, 90);
+
+        // bottom fold shadow
+        g = x.createLinearGradient(0, c.height - 40, 0, c.height);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, "rgba(0,0,0,0.10)");
+        x.fillStyle = g;
+        x.fillRect(0, c.height - 40, c.width, 40);
+
+        paperGrain(x, c.width, c.height, 1.2);
+        return toTexture(c);
+      }
+
+      function plain(color) {
+        const c = document.createElement("canvas");
+        c.width = c.height = 512;
+        const x = c.getContext("2d");
+        x.fillStyle = color;
+        x.fillRect(0, 0, 512, 512);
+        paperGrain(x, 512, 512, 1);
+        return toTexture(c);
+      }
+
+      /* ---------- hexagonal box: base + overlapping lid ---------- */
+      const R      = 1.75;   // base hexagon circumradius
+      const BASE_H = 1.35;
+      const LID_R  = R * 1.045;
+      const LID_H  = 0.78;
+
+      const mat = (map, flat) => new THREE.MeshStandardMaterial({
+        map, metalness: 0.0, roughness: 0.82,           // matte uncoated cardstock
+        flatShading: !!flat,
+        bumpMap: bumpTex, bumpScale: 0.02               // paper tooth micro-relief
+      });
+
+      const boxGroup = new THREE.Group();
+
+      // base (white)
+      const baseGeo = new THREE.CylinderGeometry(R, R, BASE_H, 6, 1);
+      const base = new THREE.Mesh(baseGeo, [
+        mat(baseSide(), true),          // side panels
+        mat(plain(WHITE), true),        // top (hidden inside lid)
+        mat(plain(WHITE), true)         // bottom
+      ]);
+      base.position.y = 0;
+      base.castShadow = true;
+      base.receiveShadow = true;
+      boxGroup.add(base);
+
+      // lid (navy sides + white printed top)
+      const lidGeo = new THREE.CylinderGeometry(LID_R, LID_R, LID_H, 6, 1);
+      const lid = new THREE.Mesh(lidGeo, [
+        mat(lidSide(), true),
+        mat(topFace(), true),
+        mat(plain(NAVY), true)
+      ]);
+      // lid overlaps the top of the base, leaving a white band below
+      lid.position.y = BASE_H / 2 - LID_H / 2 + 0.16;
+      lid.castShadow = true;
+      lid.receiveShadow = true;
+      boxGroup.add(lid);
+
+      // crisp edge catch on both parts
+      [ [baseGeo, base], [lidGeo, lid] ].forEach(([g, mesh]) => {
+        const el = new THREE.LineSegments(
+          new THREE.EdgesGeometry(g, 30),
+          new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 })
+        );
+        el.position.copy(mesh.position);
+        el.scale.set(1.0015, 1.0015, 1.0015);
+        boxGroup.add(el);
+      });
+
+      scene.add(boxGroup);
+      boxGroup.position.y = 0.2;
+
+      /* ---------- soft ground shadow only ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.30 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -BASE_H / 2 + 0.2 - 0.001;
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.42, y: Math.PI / 6 };   // start tilted like the mockup
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const d = camera.position.length();
+        if (d < 4.5) camera.position.setLength(4.5);
+        if (d > 15)  camera.position.setLength(15);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      /* ---------- touch: 1 finger = rotate, 2 fingers = pinch-zoom ----------
+         touch-action:none (set in CSS) + preventDefault here stop the PAGE
+         from scrolling/zooming while a finger is over the model — the
+         gesture drives the 3D view instead. */
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const d = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - d) * 0.004);
+          pinchDist = d;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      /* ---------- wheel zoom (desktop) ---------- */
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        renderer.render(scene, camera);
+      })();
+
+      console.log("✓ hexagon box ready");
+    }
+  </script>
+</body>
+</html>
