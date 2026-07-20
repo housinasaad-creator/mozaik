@@ -594,4 +594,9 @@ html[lang="ar"] .infocard__k{ letter-spacing:.04em; }
   .nav.is-scrolled{ background:#0a1330; backdrop-filter:none; -webkit-backdrop-filter:none; }
   .footer{ background:#0a1330; backdrop-filter:none; -webkit-backdrop-filter:none; }
   .nav__links,.lang__menu,.modal__backdrop{ backdrop-filter:none; -webkit-backdrop-filter:none; }
+  /* A position:fixed layer forces a repaint every scroll frame on phones -> jank.
+     Let the decorative dot screen scroll WITH the page instead (covers full doc height via body{position:relative}). */
+  body::before{ position:absolute; }
+  /* mask + filter on a playing <video> are GPU-costly each frame; the veil already darkens the hero */
+  .hero__bg-video{ -webkit-mask-image:none; mask-image:none; filter:none; }
 }
