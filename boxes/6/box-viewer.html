@@ -132,7 +132,7 @@
       /* ---------- renderer ---------- */
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia("(pointer:coarse)").matches ? 1 : 1.5));  // lower render res: 1x phones / 1.5x desktop (GPU perf)
       renderer.shadowMap.enabled = false;   // ground shadow removed (perf: no shadow-map pass)
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
