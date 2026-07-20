@@ -292,9 +292,9 @@
     if (!$(".testi[hidden]")) testiMoreBtn.classList.add("is-hidden");
   });
 
-  /* ---- Lenis + GSAP ---- */
+  /* ---- Lenis + GSAP (desktop only — smooth-scroll rAF loops cause lag on mobile; touch uses native scroll) ---- */
   let lenis = null;
-  if (window.Lenis && !reduced) {
+  if (window.Lenis && !reduced && fine) {
     lenis = new Lenis({ duration: 1.1, smoothWheel: true });
     if (!(window.gsap && window.ScrollTrigger)) { const r = (t) => { lenis.raf(t); requestAnimationFrame(r); }; requestAnimationFrame(r); }
     $$('a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
