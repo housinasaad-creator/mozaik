@@ -93,11 +93,10 @@
     const viewport = track.parentElement;
     const N = slides.length;
     let idx = 0;
-    // Only run the (single) 3D viewer while the products section is actually on screen; unload it otherwise.
-    let sectionInView = true;
-    const psec = track.closest("section") || track;
-    new IntersectionObserver((es) => es.forEach((en) => { sectionInView = en.isIntersecting; render(); }),
-      { rootMargin: "150px 0px" }).observe(psec);
+    // The centred box stays LOADED even when the products section scrolls off-screen,
+    // so scrolling back never re-inits the 3D viewer (that reload was the scroll lag).
+    // Still only ONE box is ever live at a time — it swaps when you change cards. On
+    // first load only card #1 (idx 0) loads.
     const dots = slides.map((_, i) => {
       const b = document.createElement("button");
       b.type = "button"; b.setAttribute("role", "tab");
@@ -136,8 +135,9 @@
         // only the active card's iframe takes pointer events (drag to rotate); side cards pass the click to navigate.
         const ifr = s.querySelector("iframe[data-src]");
         if (ifr) {
-          // ONLY the centred box keeps a live 3D viewer — load it, unload every other one (one WebGL context max)
-          const active = ad === 0 && sectionInView;
+          // ONLY the centred box keeps a live 3D viewer — load it, unload every other one (one WebGL context max).
+          // Not gated by scroll position: the centred box stays loaded so returning to it never re-inits (no lag).
+          const active = ad === 0;
           if (active && ifr.dataset.loaded !== "1") { ifr.src = ifr.dataset.src; ifr.dataset.loaded = "1"; }
           else if (!active && ifr.dataset.loaded === "1") { ifr.src = "about:blank"; ifr.dataset.loaded = "0"; }
           ifr.style.visibility = active ? "visible" : "hidden";
