@@ -155,7 +155,7 @@
       /* ---------- renderer ---------- */
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia("(pointer:coarse)").matches ? 1 : 1.5));  // lower render res: 1x phones / 1.5x desktop (GPU perf)
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));  // render res 1.5x on all devices (phones match desktop for crisp boxes)
       renderer.shadowMap.enabled = false;   // ground shadow removed entirely (also drops the costly 2048px soft shadow-map pass)
       renderer.outputEncoding = THREE.sRGBEncoding;
       document.body.appendChild(renderer.domElement);
