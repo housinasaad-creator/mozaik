@@ -599,4 +599,6 @@ html[lang="ar"] .infocard__k{ letter-spacing:.04em; }
   body::before{ position:absolute; }
   /* mask + filter on a playing <video> are GPU-costly each frame; the veil already darkens the hero */
   .hero__bg-video{ -webkit-mask-image:none; mask-image:none; filter:none; }
+  /* No scroll fade-in on mobile: many .reveal transitions firing while scrolling cause jank — show instantly */
+  .reveal{ opacity:1 !important; transform:none !important; transition:none !important; }
 }

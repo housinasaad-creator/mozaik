@@ -275,11 +275,12 @@
     map.forEach((_, sec) => spy.observe(sec));
   })();
 
-  /* ---- Reveal on scroll (both directions: appears from nothing) ---- */
+  /* ---- Reveal on scroll (both directions: appears from nothing) — desktop only; on mobile CSS shows
+     everything instantly (constant class-toggling + transitions while scrolling caused jank) ---- */
   const io = new IntersectionObserver((es) => es.forEach((en) => {
     en.target.classList.toggle("is-in", en.isIntersecting);
   }), { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
-  $$(".reveal").forEach((el) => io.observe(el));
+  if (!matchMedia("(max-width:820px)").matches) $$(".reveal").forEach((el) => io.observe(el));
 
   /* ---- Counters ---- */
   const cio = new IntersectionObserver((es) => es.forEach((en) => {
