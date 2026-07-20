@@ -163,6 +163,7 @@
   (function () {
     const canvas = document.querySelector(".dots-fx");
     if (!canvas) return;
+    if (matchMedia("(max-width:820px)").matches) { canvas.style.display = "none"; return; }  // phones: skip animation entirely (perf)
     const ctx = canvas.getContext("2d");
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     const GAP = 38, SPEED = 0.2, OY0 = GAP / 2;   // SPEED = gentle downward drift
@@ -227,6 +228,20 @@
     document.addEventListener("pointerdown", tryPlay, { once: true });
     document.addEventListener("visibilitychange", () => { if (!document.hidden) tryPlay(); });
   }
+
+  /* ---- Mobile: tap a cert/service card to flip it to its preview image (one active at a time) ---- */
+  (function () {
+    const cards = $$(".cert, .card").filter((c) => c.querySelector(".cert__preview, .card__preview"));
+    if (!cards.length) return;
+    cards.forEach((card) => {
+      card.addEventListener("click", () => {
+        if (!matchMedia("(max-width:640px)").matches) return;   // desktop keeps the hover tooltip
+        const wasActive = card.classList.contains("is-preview");
+        cards.forEach((c) => c.classList.remove("is-preview"));  // revert any other open card
+        if (!wasActive) card.classList.add("is-preview");        // toggle this one
+      });
+    });
+  })();
 
   /* ---- Navbar + mobile menu ---- */
   const nav = $("#nav");

@@ -63,6 +63,12 @@ img[src$="logo-gold.png"]{ filter:var(--logo-filter); }
 *{ box-sizing:border-box; margin:0; padding:0; }
 html{ -webkit-text-size-adjust:100%; }
 body{ font-family:var(--font-body); background:var(--bg); color:var(--text); line-height:1.6; position:relative; padding-bottom:4rem; }
+/* Decorative print-themed backdrop (CMYK halftone dot screen) over the navy — deepest layer, so on desktop it sits behind the mosaic reveal and shows through on mobile */
+body::before{ content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(201,166,89,.07) 1px, transparent 1.7px) 0 0 / 30px 30px,
+    radial-gradient(circle at 1px 1px, rgba(120,175,225,.05) 1px, transparent 1.7px) 15px 15px / 30px 30px,
+    radial-gradient(120% 90% at 50% 0%, rgba(201,166,89,.05), transparent 60%); }
 @media (pointer:fine){ body{ cursor:none; } }
 img{ max-width:100%; display:block; }
 a{ color:inherit; text-decoration:none; }
@@ -380,7 +386,21 @@ html[dir="rtl"] .media-tag{ transform:translateX(50%); }
 .cert__preview::after,.card__preview::after{ content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:8px solid transparent; border-top-color:#0f1d3c; }
 .cert__preview img,.card__preview img{ width:100%; display:block; border-radius:8px; }
 .cert:hover .cert__preview,.cert:focus-within .cert__preview,.card:hover .card__preview,.card:focus-within .card__preview{ opacity:1; visibility:visible; transform:translateX(-50%) translateY(0) scale(1); }
-@media (max-width:640px){ .cert__preview,.card__preview{ display:none; } }
+/* Mobile: tap a card to swap it entirely to its preview image; tapping another reverts it */
+@media (max-width:640px){
+  .cert,.card{ overflow:hidden; -webkit-tap-highlight-color:transparent; cursor:pointer; }
+  .cert__preview,.card__preview{
+    display:block; position:absolute; inset:0; transform:none;
+    width:auto; height:auto; padding:10px; border:none; border-radius:inherit;
+    background:linear-gradient(180deg,#17294d,#0f1d3c); box-shadow:none;
+    opacity:0; visibility:hidden; pointer-events:none; z-index:5;
+    transition:opacity .3s var(--ease),visibility .3s; }
+  .cert__preview::after,.card__preview::after{ display:none; }
+  .cert__preview img,.card__preview img{ width:100%; height:100%; object-fit:contain; border-radius:8px; }
+  .cert.is-preview .cert__preview,.card.is-preview .card__preview{ opacity:1; visibility:visible; }
+  .cert.is-preview > :not(.cert__preview),
+  .card.is-preview > :not(.card__preview){ opacity:0; transition:opacity .25s var(--ease); }
+}
 
 /* Services */
 .cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:1.4rem; }
@@ -504,6 +524,12 @@ html[lang="ar"] .infocard__k{ letter-spacing:.04em; }
   .footer__bar{ flex-direction:column; }
   :root{ --spot:120px; }
   .pcard__num{ font-size:2.4rem; }
+}
+/* Mobile: drop heavy/decorative background layers (perf + no stuck center spotlight) and the hero logo */
+@media (max-width:820px){
+  .dots-fx{ display:none; }               /* animated golden dots — off on phones (perf) */
+  .reveal-bg,.reveal-shroud{ display:none; } /* spotlight mosaic reveal — off (no cursor -> white blob) */
+  .hero__logo{ display:none; }            /* hide hero logo on phones */
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
