@@ -218,15 +218,23 @@
     if (reduced) frame(); else loop();
   })();
 
-  /* ---- Hero video: guarantee autoplay ---- */
+  /* ---- Hero video: guarantee autoplay + pause when scrolled off-screen ---- */
   const heroVid = $(".hero__bg-video");
   if (heroVid) {
     heroVid.muted = true; heroVid.defaultMuted = true;
-    const tryPlay = () => { const p = heroVid.play(); if (p) p.catch(() => {}); };
+    let heroInView = true;                                   // only decode while the hero is visible
+    const tryPlay = () => { if (heroInView && !document.hidden) { const p = heroVid.play(); if (p) p.catch(() => {}); } };
     tryPlay();
     heroVid.addEventListener("canplay", tryPlay, { once: true });
     document.addEventListener("pointerdown", tryPlay, { once: true });
     document.addEventListener("visibilitychange", () => { if (!document.hidden) tryPlay(); });
+    // Pause the background video once the hero leaves the viewport — a video that keeps decoding
+    // while you scroll the rest of the page is the main cause of homepage scroll jank on mobile.
+    const heroSec = $(".hero") || heroVid;
+    new IntersectionObserver((es) => es.forEach((en) => {
+      heroInView = en.isIntersecting;
+      if (heroInView) tryPlay(); else heroVid.pause();
+    }), { threshold: 0.05 }).observe(heroSec);
   }
 
   /* ---- Mobile: tap a cert/service card to flip it to its preview image (one active at a time) ---- */
