@@ -235,7 +235,7 @@
     if (!cards.length) return;
     cards.forEach((card) => {
       card.addEventListener("click", () => {
-        if (!matchMedia("(max-width:640px)").matches) return;   // desktop keeps the hover tooltip
+        if (!matchMedia("(max-width:820px)").matches) return;   // desktop keeps the hover tooltip
         const wasActive = card.classList.contains("is-preview");
         cards.forEach((c) => c.classList.remove("is-preview"));  // revert any other open card
         if (!wasActive) card.classList.add("is-preview");        // toggle this one

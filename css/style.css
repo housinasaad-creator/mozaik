@@ -386,20 +386,23 @@ html[dir="rtl"] .media-tag{ transform:translateX(50%); }
 .cert__preview::after,.card__preview::after{ content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:8px solid transparent; border-top-color:#0f1d3c; }
 .cert__preview img,.card__preview img{ width:100%; display:block; border-radius:8px; }
 .cert:hover .cert__preview,.cert:focus-within .cert__preview,.card:hover .card__preview,.card:focus-within .card__preview{ opacity:1; visibility:visible; transform:translateX(-50%) translateY(0) scale(1); }
-/* Mobile: tap a card to swap it entirely to its preview image; tapping another reverts it */
-@media (max-width:640px){
+/* Mobile: tap a card to swap it entirely to its preview image; tapping another reverts it.
+   The image flows at full width -> the card takes the image's own aspect ratio (no gaps, no crop). */
+@media (max-width:820px){
   .cert,.card{ overflow:hidden; -webkit-tap-highlight-color:transparent; cursor:pointer; }
-  .cert__preview,.card__preview{
-    display:block; position:absolute; inset:0; transform:none;
-    width:auto; height:auto; padding:10px; border:none; border-radius:inherit;
-    background:linear-gradient(180deg,#17294d,#0f1d3c); box-shadow:none;
-    opacity:0; visibility:hidden; pointer-events:none; z-index:5;
-    transition:opacity .3s var(--ease),visibility .3s; }
-  .cert__preview::after,.card__preview::after{ display:none; }
-  .cert__preview img,.card__preview img{ width:100%; height:100%; object-fit:contain; border-radius:8px; }
-  .cert.is-preview .cert__preview,.card.is-preview .card__preview{ opacity:1; visibility:visible; }
+  .cert__preview,.card__preview{ display:none; }              /* hidden until the card is tapped */
+  .cert.is-preview,.card.is-preview{ display:block; padding:0; min-height:140px; position:relative; }
+  /* normal content: pulled out of flow + faded so it no longer dictates the card height */
   .cert.is-preview > :not(.cert__preview),
-  .card.is-preview > :not(.card__preview){ opacity:0; transition:opacity .25s var(--ease); }
+  .card.is-preview > :not(.card__preview){ position:absolute; opacity:0; pointer-events:none; }
+  /* preview becomes the card body: full width, natural height => card matches image proportions */
+  .cert.is-preview .cert__preview,.card.is-preview .card__preview{
+    display:block; position:static; width:100%; padding:0; margin:0;
+    border:none; border-radius:inherit; background:none; box-shadow:none;
+    opacity:1; visibility:visible; transform:none; pointer-events:auto; }
+  .cert.is-preview .cert__preview::after,.card.is-preview .card__preview::after{ display:none; }
+  .cert.is-preview .cert__preview img,.card.is-preview .card__preview img{
+    width:100%; height:auto; display:block; border-radius:inherit; }
 }
 
 /* Services */
