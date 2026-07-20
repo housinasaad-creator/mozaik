@@ -148,7 +148,7 @@
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.enabled = false;   // ground shadow removed (perf: no shadow-map pass)
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
       document.body.appendChild(renderer.domElement);

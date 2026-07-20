@@ -156,8 +156,7 @@
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.enabled = false;   // ground shadow removed entirely (also drops the costly 2048px soft shadow-map pass)
       renderer.outputEncoding = THREE.sRGBEncoding;
       document.body.appendChild(renderer.domElement);
 
@@ -399,12 +398,11 @@
       const sleeve = new THREE.Group();
       boxGroup.add(sleeve);
 
-      // spot-UV material: glossy (roughnessMap) + a hair of relief (bumpMap),
-      // reflecting the studio environment so the varnish visibly shines
+      // spot-UV material: FLAT glossy varnish — the raised relief (displacement + bump/emboss) is removed;
+      // the shine comes purely from the low-roughness logo areas reflecting the studio environment
       const spotMat = (maps) => new THREE.MeshStandardMaterial({
-        map: maps.map, roughnessMap: maps.rough, bumpMap: maps.bump, metalnessMap: maps.metal,
-        displacementMap: maps.disp, displacementScale: 0.018, displacementBias: 0,  // REAL raised relief (subtle)
-        metalness: 1.0, roughness: 1.0, bumpScale: 0.03,    // bump adds fine grain on top of the relief
+        map: maps.map, roughnessMap: maps.rough, metalnessMap: maps.metal,
+        metalness: 1.0, roughness: 1.0,
         envMapIntensity: 2.4, side: THREE.DoubleSide
       });
 

@@ -175,7 +175,7 @@
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);   // transparent → the CSS gradient background shows through
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.enabled = false;   // ground shadow removed (perf: no shadow-map pass)
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
       // HDRI-grade tone mapping → richer highlights on the gold foil, cleaner display
