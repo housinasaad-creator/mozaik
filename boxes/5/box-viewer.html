@@ -223,29 +223,6 @@
         }
       }
 
-      const bumpTex = (function () {
-        const c = document.createElement("canvas");
-        c.width = c.height = 512;
-        const x = c.getContext("2d");
-        x.fillStyle = "#808080";
-        x.fillRect(0, 0, 512, 512);
-        const d = x.getImageData(0, 0, 512, 512);
-        for (let i = 0; i < d.data.length; i += 4) {
-          const n = 128 + (Math.random() - 0.5) * 30;
-          d.data[i] = d.data[i + 1] = d.data[i + 2] = n;
-        }
-        x.putImageData(d, 0, 0);
-        for (let i = 0; i < 260; i++) {
-          x.strokeStyle = "rgba(" + (Math.random() > 0.5 ? "200,200,200" : "60,60,60") + ",0.08)";
-          const fy = Math.random() * 512, fx = Math.random() * 512;
-          x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx + 4 + Math.random() * 10, fy + (Math.random() - 0.5) * 2); x.stroke();
-        }
-        const t = new THREE.CanvasTexture(c);
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(3, 3);
-        return t;
-      })();
-
       function plainPanel(w, h, base, strength) {
         const c = document.createElement("canvas");
         c.width = w; c.height = h;
@@ -351,7 +328,7 @@
       }
 
       const cardMat = (map) => new THREE.MeshStandardMaterial({
-        map, metalness: 0.0, roughness: 0.85, bumpMap: bumpTex, bumpScale: 0.012, side: THREE.DoubleSide
+        map, metalness: 0.0, roughness: 0.3, side: THREE.DoubleSide   // glossy Spot-UV sheen; emboss/bump removed
       });
 
       /* =========================================================

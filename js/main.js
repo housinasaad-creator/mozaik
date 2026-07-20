@@ -93,6 +93,11 @@
     const viewport = track.parentElement;
     const N = slides.length;
     let idx = 0;
+    // Only run the (single) 3D viewer while the products section is actually on screen; unload it otherwise.
+    let sectionInView = true;
+    const psec = track.closest("section") || track;
+    new IntersectionObserver((es) => es.forEach((en) => { sectionInView = en.isIntersecting; render(); }),
+      { rootMargin: "150px 0px" }).observe(psec);
     const dots = slides.map((_, i) => {
       const b = document.createElement("button");
       b.type = "button"; b.setAttribute("role", "tab");
@@ -131,11 +136,12 @@
         // only the active card's iframe takes pointer events (drag to rotate); side cards pass the click to navigate.
         const ifr = s.querySelector("iframe[data-src]");
         if (ifr) {
-          const near = ad <= 1;
-          if (near && ifr.dataset.loaded !== "1") { ifr.src = ifr.dataset.src; ifr.dataset.loaded = "1"; }
-          else if (ad > 2 && ifr.dataset.loaded === "1") { ifr.src = "about:blank"; ifr.dataset.loaded = "0"; }
-          ifr.style.visibility = near ? "visible" : "hidden";
-          ifr.style.pointerEvents = ad === 0 ? "auto" : "none";
+          // ONLY the centred box keeps a live 3D viewer — load it, unload every other one (one WebGL context max)
+          const active = ad === 0 && sectionInView;
+          if (active && ifr.dataset.loaded !== "1") { ifr.src = ifr.dataset.src; ifr.dataset.loaded = "1"; }
+          else if (!active && ifr.dataset.loaded === "1") { ifr.src = "about:blank"; ifr.dataset.loaded = "0"; }
+          ifr.style.visibility = active ? "visible" : "hidden";
+          ifr.style.pointerEvents = active ? "auto" : "none";
         }
       });
       dots.forEach((d, k) => d.classList.toggle("is-active", k === idx));

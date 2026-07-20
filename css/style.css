@@ -78,6 +78,10 @@ h1,h2,h3{ font-family:var(--font-head); font-weight:700; line-height:1.08; lette
 .hero__title,.section-title,.jflow-title,.catalog-item__text h2{ font-family:var(--font-display); letter-spacing:0; }
 .container{ width:min(100% - 4rem,var(--container)); margin-inline:auto; }
 .section{ padding:clamp(4.5rem,10vw,8rem) 0; position:relative; }
+/* Perf: render only sections near the viewport; the browser skips painting/layout for off-screen ones.
+   Carousel (.products) + map (.location) are excluded (they need a live subtree). contain-intrinsic-size:auto
+   remembers each section's real height after first render, so there's no scroll jump. */
+.section.about,.section.quality,.section.services,.section.clients{ content-visibility:auto; contain-intrinsic-size:auto 800px; }
 /* small centred gold divider between consecutive sections */
 .section + .section::before{ content:""; position:absolute; top:0; left:50%; transform:translateX(-50%); width:64px; height:2px; border-radius:2px; pointer-events:none; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
 .grad{ background:linear-gradient(100deg,var(--accent-soft),var(--accent) 55%,var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
