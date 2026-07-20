@@ -298,8 +298,8 @@
          ========================================================= */
       const BW = 2.6, BH = 1.7, BD = 1.7;   // body: width(x), height(y), depth(z)
       const tL  = 0.004;                     // liner thickness (very thin, per side)
-      const gap = 0.024;                     // flute gap between the two liners
-      const TC  = 2 * tL + gap;              // total board thickness (~0.032 — very thin)
+      const gap = 0.016;                     // flute gap between the two liners (compressed a bit → thinner board, wave kept)
+      const TC  = 2 * tL + gap;              // total board thickness (~0.024 — thinner)
       const amp = gap * 0.5 * 0.92;          // flute wave amplitude (deep, nearly liner-to-liner)
       const per = 0.055;                     // flute pitch (tight waves = real corrugation feel)
 
@@ -316,7 +316,7 @@
          The flute is a real wavy sheet spanning the gap; it is inset from the
          panel border so the white outer liner alone reads at folded corners. */
       const SHOW_FLUTE = true;    // internal wavy kraft sheet (mimics real corrugation) — KEPT ON. Its brown leak at the box corners is hidden by white corner posts, not by removing it.
-      function corrugatedBoard(w, h, outerMat, edgeKraft) {
+      function corrugatedBoard(w, h, outerMat, edgeKraft, fluteFull, topKraft) {
         const g = new THREE.Group();
 
         // thin cut-edge liner colour. Body panels keep WHITE edges (so the box
@@ -326,14 +326,16 @@
 
         // OUTER liner — printed/white face (+z); thin edges ALWAYS white so the
         // closed lid perimeter / box corners stay white on the OUTSIDE.
-        const outer = boxMesh(w, h, tL, [wMat(), wMat(), wMat(), wMat(), outerMat, wMat()]);
+        // topKraft → the TOP cut edge (+y) is kraft (real box rims are brown); vertical
+        // corner edges stay white so the box corners still read white from OUTSIDE.
+        const outer = boxMesh(w, h, tL, [wMat(), wMat(), topKraft ? kMat() : wMat(), wMat(), outerMat, kMat()]);   // BACK face (-z, toward interior) is KRAFT → at a fold/crease the inside reads brown, never a white line; printed OUTSIDE (+z) stays white
         outer.position.z = TC / 2 - tL / 2;
         g.add(outer);
 
         // INNER liner — kraft on the INSIDE surface (-z); thin edges per eM (kraft on
         // flaps) so the flap-to-flap corners read brown/merged from INSIDE. The
         // corrugation still reads from inside via the brown flute in the gap.
-        const inner = boxMesh(w, h, tL, [eM(), eM(), eM(), eM(), wMat(), kMat()]);
+        const inner = boxMesh(w, h, tL, [eM(), eM(), topKraft ? kMat() : eM(), eM(), wMat(), kMat()]);
         inner.position.z = -(TC / 2 - tL / 2);
         g.add(inner);
 
@@ -342,7 +344,7 @@
         // corners at grazing angles no matter how far it was inset. The inside surfaces
         // are already kraft via the inner liner, so dropping it loses nothing visible.
         if (SHOW_FLUTE) {
-          const mrgX = TC * 4, mrgY = TC * 4;
+          const mrgX = fluteFull ? tL : TC * 4, mrgY = fluteFull ? tL : TC * 4;   // fluteFull → corrugated core fills the whole flap (matches the ear/flap footprint)
           const x0 = -w / 2 + mrgX, x1 = w / 2 - mrgX, y0 = -h / 2 + mrgY, y1 = h / 2 - mrgY;
           const N = Math.max(8, Math.round((x1 - x0) / per * 2));
           const pos = [], idx = [];
@@ -379,10 +381,10 @@
       const body = new THREE.Group();
       boxGroup.add(body);
 
-      (function () { const b = corrugatedBoard(BW, BH, cardMat(frontLogoTex)); b.position.set(0, 0, BD / 2 - TC / 2); body.add(b); })();               // front (+z)
-      (function () { const b = corrugatedBoard(BW, BH, cardMat(backLogoTex));  b.rotation.y = Math.PI;      b.position.set(0, 0, -BD / 2 + TC / 2); body.add(b); })();  // back (-z)
-      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(markTexR)); b.rotation.y =  Math.PI / 2; b.position.set(BW / 2 - TC / 2, 0, 0); body.add(b); })(); // right (+x)
-      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(markTexL)); b.rotation.y = -Math.PI / 2; b.position.set(-BW / 2 + TC / 2, 0, 0); body.add(b); })(); // left (-x)
+      (function () { const b = corrugatedBoard(BW, BH, cardMat(frontLogoTex), false, false, true); b.position.set(0, 0, BD / 2 - TC / 2); body.add(b); })();               // front (+z)
+      (function () { const b = corrugatedBoard(BW, BH, cardMat(backLogoTex), false, false, true);  b.rotation.y = Math.PI;      b.position.set(0, 0, -BD / 2 + TC / 2); body.add(b); })();  // back (-z)
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(markTexR), false, false, true); b.rotation.y =  Math.PI / 2; b.position.set(BW / 2 - TC / 2, 0, 0); body.add(b); })(); // right (+x)
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(markTexL), false, false, true); b.rotation.y = -Math.PI / 2; b.position.set(-BW / 2 + TC / 2, 0, 0); body.add(b); })(); // left (-x)
 
       /* ---------- WHITE CORNER POSTS ----------
          A slim WHITE column capping each vertical corner, same white as the faces so
@@ -428,7 +430,7 @@
         const yBase = -BH / 2;                          // outer (white) bottom plane
         // one flat board, OUTER face DOWN (-y), outer surface sitting at plane `outerY`
         function botBoard(w, h, outerY, cx, cz) {
-          const b = corrugatedBoard(w, h, wMat()); // white edges → no brown line on the outside bottom rim
+          const b = corrugatedBoard(w, h, wMat(), true, true); // KRAFT inner edges (no white line at the base seam from inside) + full-size flute. Outer/bottom liner edges stay white → outside bottom rim still clean white.
           b.rotation.x = Math.PI / 2;                    // outer (+z) → -y (face down/outward)
           b.position.set(cx, outerY + TC / 2, cz);       // board centre → outer surface lands on outerY
           body.add(b);
@@ -447,7 +449,7 @@
       // continuously around the wall's top edge with NO seam/gap on the outside.
       function horizFlap(localW, localH) {
         const holder = new THREE.Group();
-        const b = corrugatedBoard(localW, localH, wMat());   // white edges → NO brown line shows on the outside rim
+        const b = corrugatedBoard(localW, localH, wMat(), true, true, true);   // KRAFT inner + top edges (inside rim reads brown when flaps splay obtuse); outer liner edges stay white → closed-box outside rim stays white. FULL-SIZE flute.
         b.rotation.x = -Math.PI / 2;   // outer (+z) → +y (up); local +y → world -z
         b.position.y = -TC / 2;        // outer liner ↓ onto the fold axis (seamless)
         holder.add(b);

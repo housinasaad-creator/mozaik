@@ -467,11 +467,11 @@
       dRight.position.set(DW / 2 - DT / 2, DH / 2, 0);
       drawer.add(dRight);
 
-      /* ---------- inner 3×3 divider grid → 9 compartments (like the reference) ---------- */
+      /* ---------- inner 3×4 divider grid → 12 compartments ---------- */
       {
         const gx = DW / 2 - DT, gz = DL / 2 - DT;   // inner clear half-extents
         const divT = 0.025;                         // thin divider board (smaller pieces)
-        const divH = DH * 0.62;                      // lower dividers — sit well below the rim
+        const divH = DH;                             // FULL height → divider tops flush with the green rim
         const yC = divH / 2;
         const eps = 0.01;                            // pull ends off the walls (no z-fight)
         // two dividers running along Z → split the WIDTH into 3 columns
@@ -480,8 +480,8 @@
           d.position.set(xC, yC, 0);
           drawer.add(d);
         });
-        // two dividers running along X → split the LENGTH into 3 rows
-        [-gz / 3, gz / 3].forEach((zC) => {
+        // three dividers running along X → split the LENGTH into 4 rows (3×4 = 12)
+        [-gz / 2, 0, gz / 2].forEach((zC) => {
           const d = boxMesh(2 * gx - eps, divH, divT, [bMat(), bMat(), bMat(), bMat(), bMat(), bMat()]);
           d.position.set(0, yC, zC);
           drawer.add(d);

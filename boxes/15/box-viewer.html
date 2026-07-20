@@ -352,9 +352,8 @@
 
       /* clean WHITE board — for the lid (roof + gable + handle) */
       function fillWhite(x, w, h) {
-        const g = x.createLinearGradient(0, 0, 0, h);
-        g.addColorStop(0.0, PAPER_HI); g.addColorStop(0.55, PAPER); g.addColorStop(1.0, PAPER_LO);
-        x.fillStyle = g; x.fillRect(0, 0, w, h);
+        // solid uniform white (no gradient) → the lids/gables match the white side faces exactly
+        x.fillStyle = PAPER_HI; x.fillRect(0, 0, w, h);
       }
       function plainWhite(w, h, strength) {
         const c = document.createElement("canvas");
@@ -408,10 +407,11 @@
 
       /* foil panel: navy board + a GOLD, metallic-glossy Mozaik mark. The maps gate
          the shine to the mark only — the board around it stays matte navy. */
-      function foilPanelMaps(wPx, hPx, frac) {
+      function foilPanelMaps(wPx, hPx, frac, baseHex, doGrain, doBump) {
         const base = document.createElement("canvas"); base.width = wPx; base.height = hPx;
         const bx = base.getContext("2d");
-        fillBoard(bx, wPx, hPx);   // graded navy board behind the foil mark
+        if (baseHex) { bx.fillStyle = baseHex; bx.fillRect(0, 0, wPx, hPx); }   // solid flat colour (no gradient/mottle)
+        else fillBoard(bx, wPx, hPx);   // graded navy board behind the foil mark
 
         const rgh = document.createElement("canvas"); rgh.width = wPx; rgh.height = hPx;
         const rx = rgh.getContext("2d");
@@ -423,7 +423,22 @@
 
         // paper grain goes on the BOARD FIRST → the foil mark then sits clean on
         // top of it, so the gold reads smooth (أملس) with no creasing over it
-        paperGrain(bx, wPx, hPx, 0.55);
+        if (doGrain !== false) paperGrain(bx, wPx, hPx, 0.55);   // skip grain → solid flat face
+
+        // optional per-panel BUMP: fine paper-fibre roughness on the board, but FLAT
+        // (mid-grey, no displacement) under the logo → the gold foil stays perfectly smooth
+        let bmp = null, bpx = null;
+        if (doBump) {
+          bmp = document.createElement("canvas"); bmp.width = wPx; bmp.height = hPx;
+          bpx = bmp.getContext("2d");
+          bpx.fillStyle = "#808080"; bpx.fillRect(0, 0, wPx, hPx);
+          const id = bpx.getImageData(0, 0, wPx, hPx);
+          for (let i = 0; i < id.data.length; i += 4) {
+            const n = 128 + (Math.random() - 0.5) * 34;   // subtle paper-fibre noise
+            id.data[i] = id.data[i + 1] = id.data[i + 2] = n;
+          }
+          bpx.putImageData(id, 0, 0);
+        }
 
         if (logoArt) {
           const ratio = logoArt.naturalHeight / logoArt.naturalWidth;
@@ -442,14 +457,18 @@
           bx.drawImage(logoArt, px, py, lw, lh);          // gold colour
           rx.drawImage(stencil("#1e1e1e"), px, py, lw, lh); // very glossy foil (~0.12) → sharp shine
           mtx.drawImage(stencil("#f4f4f4"), px, py, lw, lh); // near-full metal (~0.96) → strong gold reflection
+          if (bpx) bpx.drawImage(stencil("#808080"), px, py, lw, lh);   // logo area → flat grey → smooth foil (no bump)
         }
-        return { map: toTexture(base), rough: toTexture(rgh), metal: toTexture(met) };
+        const out = { map: toTexture(base), rough: toTexture(rgh), metal: toTexture(met) };
+        if (bmp) { const bt = new THREE.CanvasTexture(bmp); bt.anisotropy = renderer.capabilities.getMaxAnisotropy(); out.bump = bt; }   // linear (NOT sRGB) — it's a bump map
+        return out;
       }
 
-      /* NOTE: no bumpMap on the foil → the gold mark stays perfectly smooth (أملس),
-         no creasing; the shine comes from the HDRI environment reflection only */
+      /* foil material: the board can carry a paper-fibre bump (maps.bump), but that
+         bump is FLAT under the logo → the gold mark stays perfectly smooth (أملس) */
       const foilMat = (maps) => new THREE.MeshStandardMaterial({
         map: maps.map, roughnessMap: maps.rough, metalnessMap: maps.metal,
+        bumpMap: maps.bump || null, bumpScale: maps.bump ? 0.02 : 0,
         metalness: 1.0, roughness: 1.0, envMapIntensity: 3.1, side: THREE.DoubleSide  // gold foil; board stays matte
       });
 
@@ -486,10 +505,11 @@
       const trayGroup = new THREE.Group();
 
       const sideCard  = plainCardboard(1024, 512, 0.6);
-      const frontMaps = foilPanelMaps(1400, 500, 0.46);   // wide front/back walls — bigger logo
-      const backMaps  = foilPanelMaps(1400, 500, 0.46);
-      const leftMaps  = foilPanelMaps(950, 700, 0.82);    // short end walls — bigger logo
-      const rightMaps = foilPanelMaps(950, 700, 0.82);
+      const insideWhite = plainWhite(1024, 512, 0.5);   // white board for the INSIDE surfaces (walls + floor + top rim)
+      const frontMaps = foilPanelMaps(1400, 500, 0.46, NAVY, false);      // BIG faces: solid flat navy (no mottle) + gold foil
+      const backMaps  = foilPanelMaps(1400, 500, 0.46, NAVY, false);
+      const leftMaps  = foilPanelMaps(950, 700, 0.82, PAPER_HI, true, true);    // SMALL faces: white + gold foil + paper grain & bump (rough board, SMOOTH logo)
+      const rightMaps = foilPanelMaps(950, 700, 0.82, PAPER_HI, true, true);
 
       /* bottom face: cardboard + the center SEAM line where the two glued
          closure flaps of a real folding carton meet */
@@ -520,7 +540,7 @@
 
       /* ---------- body: floor + 4 walls (logo on every outward face) ---------- */
       const floor = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, FLOOR_T, BOX_D), [
-        cardMat(sideCard), cardMat(sideCard), cardMat(sideCard),
+        cardMat(sideCard), cardMat(sideCard), cardMat(insideWhite),   // +y: the INSIDE floor → white
         cardMat(floorTex),                       // -y: the outside bottom shows the seam
         cardMat(sideCard), cardMat(sideCard)
       ]);
@@ -531,29 +551,30 @@
       // BoxGeometry face order [+x,-x,+y,-y,+z,-z] — logo ONLY on the single
       // outward-facing side of each wall, plain cardboard everywhere else
       const plainSide = () => cardMat(sideCard);
+      const whiteSide = () => cardMat(insideWhite);   // inside-facing white board
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, WALL_T), [
-        plainSide(), plainSide(), plainSide(), plainSide(), plainSide(), foilMat(backMaps)
+        plainSide(), plainSide(), whiteSide(), plainSide(), whiteSide(), foilMat(backMaps)   // +y top rim & +z inner face → white
       ]);
       backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + WALL_T / 2);
       backWall.castShadow = backWall.receiveShadow = true;
       trayGroup.add(backWall);
 
       const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, WALL_T), [
-        plainSide(), plainSide(), plainSide(), plainSide(), foilMat(frontMaps), plainSide()
+        plainSide(), plainSide(), whiteSide(), plainSide(), foilMat(frontMaps), whiteSide()   // +y top rim & -z inner face → white
       ]);
       frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - WALL_T / 2);
       frontWall.castShadow = frontWall.receiveShadow = true;
       trayGroup.add(frontWall);
 
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, BOX_H, BOX_D), [
-        plainSide(), foilMat(leftMaps), plainSide(), plainSide(), plainSide(), plainSide()
+        whiteSide(), foilMat(leftMaps), whiteSide(), plainSide(), plainSide(), plainSide()   // +x inner & +y rim → white; outer white face = grainy board + smooth foil logo
       ]);
       leftWall.position.set(-BOX_W / 2 + WALL_T / 2, BOX_H / 2 + FLOOR_T, 0);
       leftWall.castShadow = leftWall.receiveShadow = true;
       trayGroup.add(leftWall);
 
       const rightWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, BOX_H, BOX_D), [
-        foilMat(rightMaps), plainSide(), plainSide(), plainSide(), plainSide(), plainSide()
+        foilMat(rightMaps), whiteSide(), whiteSide(), plainSide(), plainSide(), plainSide()   // -x inner & +y rim → white; outer white face = grainy board + smooth foil logo
       ]);
       rightWall.position.set(BOX_W / 2 - WALL_T / 2, BOX_H / 2 + FLOOR_T, 0);
       rightWall.castShadow = rightWall.receiveShadow = true;
@@ -656,7 +677,23 @@
         shape.lineTo(RUN, 0);
         shape.lineTo(0, GABLE_H);
         shape.closePath();
-        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: WALL_T, bevelEnabled: false }));
+
+        // die-cut interlock SLOT — a slim VERTICAL slot that starts right below the
+        // apex and runs DOWN toward the round lock tab on the wide top lid, so the
+        // tab tucks into it as the box shuts (real folding-carton overlap)
+        const sr = 0.035;                    // slot half-width (slim)
+        const yTop = GABLE_H - 0.045;        // starts just under the head
+        const yBot = 0.50;                   // reaches down toward the lid lock circle (shorter slot)
+        const cyT = yTop - sr, cyB = yBot + sr;
+        const slot = new THREE.Path();
+        slot.moveTo(sr, cyB);
+        slot.lineTo(sr, cyT);
+        slot.absarc(0, cyT, sr, 0, Math.PI, false);          // top cap
+        slot.lineTo(-sr, cyB);
+        slot.absarc(0, cyB, sr, Math.PI, Math.PI * 2, false); // bottom cap
+        shape.holes.push(slot);
+
+        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: WALL_T, bevelEnabled: false, curveSegments: 20 }));
         // shape-x → world z, extrude → inward along x (mirrored per side)
         geo.rotateY(sign > 0 ? -Math.PI / 2 : Math.PI / 2);
         return geo;
@@ -696,14 +733,17 @@
 
       /* ---------- fold state: 1 = closed, 0 = open from the top ---------- */
       const LID_OPEN = 1.9, GABLE_OPEN = 1.45;
+      const LID_END = 0.55;   // SEQUENCED close: the wide lids shut FIRST over t:0→0.55, THEN the end triangles over t:0.55→1
       let foldTarget = 1, fold = 1;
       function applyFold(t) {
-        const open = 1 - t;
-        frontLid.rotation.x = open * LID_OPEN;        // swings forward-down
-        backLid.rotation.x = -open * LID_OPEN;        // swings backward-down
+        const lidT   = Math.min(1, t / LID_END);                    // wide flaps: close first, fully
+        const gableT = Math.max(0, (t - LID_END) / (1 - LID_END));  // end triangles: close only after the flaps are shut
+        const lidOpen = 1 - lidT;
+        frontLid.rotation.x =  lidOpen * LID_OPEN;    // swings forward-down
+        backLid.rotation.x  = -lidOpen * LID_OPEN;    // swings backward-down
         // closed: leaning INWARD at the sharp tilt · open: flopped outward
-        rightGable.rotation.z = GABLE_TILT * t - open * GABLE_OPEN;
-        leftGable.rotation.z = -GABLE_TILT * t + open * GABLE_OPEN;
+        rightGable.rotation.z =  GABLE_TILT * gableT - (1 - gableT) * GABLE_OPEN;
+        leftGable.rotation.z  = -GABLE_TILT * gableT + (1 - gableT) * GABLE_OPEN;
       }
       applyFold(fold);
 
