@@ -123,10 +123,10 @@
   <script>
     "use strict";
 
-    /* ---------- palette (Spot UV box: graphite sleeve + emerald drawer) ---------- */
-    const WHITE = "#2b2f33";     // matte graphite sleeve — darker (was #3f4448)
-    const BLUE  = "#0b6242";     // emerald-green inner drawer — one shade deeper (was #10794f)
-    const LOGOTINT = "#848c93";  // glossy tonal grey for the sleeve mark — reads as spot-UV varnish
+    /* ---------- palette (COLOUR VARIANT: white sleeve + navy drawer + full-colour logo) ---------- */
+    const WHITE = "#141a30";     // navy sleeve (outside) (كحلي)
+    const BLUE  = "#f4f4f2";     // white inner drawer
+    const LOGOTINT = "#848c93";  // (unused in this variant — the logo stays full colour)
 
     const logoImg = new Image();
     logoImg.onload  = () => init(logoImg);
@@ -150,7 +150,7 @@
         gc.naturalWidth = gc.width; gc.naturalHeight = gc.height;
         logoTinted = gc;
       }
-      const logoArt = logoTinted || logo;
+      const logoArt = logo || logoTinted;   // full-colour Mozaik logo (colour variant)
 
       /* ---------- renderer ---------- */
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -340,7 +340,7 @@
           // emboss → a white plateau with soft (blurred) bevel edges: the mark reads
           // as clearly RAISED, and the sloped edges catch the light
           mpx.save(); mpx.filter = "blur(3px)"; place(mpx, stencil("#ffffff")); mpx.restore();
-          place(mtx, stencil("#787878")); // metal  → ~0.47 reflective, ONLY on the mark
+          place(mtx, stencil("#1c1c1c")); // metal → low (~0.11) so the FULL-COLOUR logo stays readable (colour variant)
           // displacement height field — soft bevel so the raised edges slope, not cliff
           dpx.save(); dpx.filter = "blur(2px)"; place(dpx, stencil("#ffffff")); dpx.restore();
         }
