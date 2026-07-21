@@ -242,18 +242,27 @@
 
       /* a panel with the Mozaik logo pasted exactly as supplied (centered),
          choosing the white or the colored artwork to read on the given bg */
-      function logoPanelTexture(wPx, hPx, base, frac, useWhite, rot) {
+      function logoPanelTexture(wPx, hPx, base, frac, useWhite, rot, keepFrac) {
         const c = document.createElement("canvas");
         c.width = wPx; c.height = hPx;
         const x = c.getContext("2d");
         x.fillStyle = base;
         x.fillRect(0, 0, wPx, hPx);
-        const logo = useWhite? (logoWhite || logoColored) : (logoColored || logoWhite);
+        let logo = useWhite? (logoWhite || logoColored) : (logoColored || logoWhite);
+        // keepFrac < 1 → crop away the bottom of the logo art (the "OFSET VE AMBALAJ" subtitle line)
+        if (logo && keepFrac && keepFrac < 1 && logo.naturalWidth) {
+          const cc = document.createElement("canvas");
+          cc.width = logo.naturalWidth;
+          cc.height = Math.round(logo.naturalHeight * keepFrac);
+          cc.getContext("2d").drawImage(logo, 0, 0);
+          logo = cc;   // canvas: use .width/.height below
+        }
         if (logo) {
           x.save();
           x.translate(wPx / 2, hPx / 2);
           if (rot) x.rotate(rot);
-          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lgW = logo.naturalWidth || logo.width, lgH = logo.naturalHeight || logo.height;
+          const ratio = lgH / lgW;
           const lw = Math.round(wPx * frac);
           const lh = Math.round(lw * ratio);
           x.drawImage(logo, -lw / 2, -lh / 2, lw, lh);
@@ -477,7 +486,7 @@
 
       const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
       const cyanTex = plainPanel(1024, 512, CYAN, 0.5);
-      const frontTex = logoPanelTexture(1400, 380, CYAN, 0.26, false, 0); // wide front wall: logo ONLY
+      const frontTex = logoPanelTexture(1400, 380, CYAN, 0.26, false, 0, 0.81); // wide front wall: logo — subtitle line ("OFSET VE AMBALAJ") cropped off
       const pinkTexL = pinkEndTexture(1400, 440); // pink end: logo + shapes
       const pinkTexR = pinkEndTexture(1400, 440);
       const lidTopTex = logoPanelTexture(1400, 900, CYAN, 0.34, false, 0); // colored logo on cyan lid top
@@ -719,5 +728,3 @@
   </script>
 </body>
 </html>
-
-      const foldSlider = document.getElementById("foldSlider");

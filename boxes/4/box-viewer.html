@@ -375,7 +375,7 @@
       const paper = new THREE.Mesh(new THREE.BoxGeometry(ENV_W - 0.22, ENV_H - 0.16, 0.004), [
         plainP(), plainP(), plainP(), plainP(), cardMat(paperTex), cardMat(paperTex)
       ]);
-      const PAPER_IN_Y = (ENV_H - 0.16) / 2 + 0.05;   // nested inside the pocket
+      const PAPER_IN_Y = ENV_H - (ENV_H - 0.16) / 2;   // top of the sheet flush with the mouth → fills the gap when closed, still slides out when open
       const PAPER_LIFT = 1.55;                         // how far it slides out
       paper.position.set(0, PAPER_IN_Y, 0);
       paper.castShadow = paper.receiveShadow = true;
@@ -406,7 +406,7 @@
         const flapT = Math.min(1, open * 1.7);
         const paperT = Math.max(0, (open - 0.4) / 0.6);
         flapPivot.rotation.x = -Math.PI * flapT;       // exactly 180° — flips fully open
-        paper.position.y = PAPER_IN_Y + PAPER_LIFT * paperT;
+        paper.position.y = PAPER_IN_Y + PAPER_LIFT * paperT;   // sheet slides out the mouth
       }
       applyFold(fold);
 
