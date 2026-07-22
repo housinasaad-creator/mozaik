@@ -422,19 +422,32 @@
      short window after load; if it is clearly struggling, flip the whole site into lite mode
      (drops the ambient dots + mosaic spotlight live, and CSS drops blur) so scrolling recovers.
      Skipped when we are already in lite mode. */
-  if (!LITE0 && !reduced) {
-    let frames = 0, t0 = 0;
-    const sample = (t) => {
-      if (document.hidden) { t0 = 0; requestAnimationFrame(sample); return; }  // rAF throttles when tab is hidden — don't misread that as low fps
-      if (!t0) { t0 = t; frames = 0; requestAnimationFrame(sample); return; }
-      frames++;
-      const elapsed = t - t0;
-      if (elapsed < 1400) { requestAnimationFrame(sample); return; }
-      const fps = (frames * 1000) / elapsed;
-      if (fps < 38) { runtimeWeak = true; html.classList.add("lite"); }   // sustained low fps -> go lite
+  if (!LITE0 && !reduced && !/[?&]full=1/.test(location.search)) {
+    let last = 0, acc = 0, frames = 0, badSecs = 0, secs = 0, armed = true;
+    const watch = (t) => {
+      if (!armed) return;
+      if (document.hidden) { last = 0; requestAnimationFrame(watch); return; }   // rAF throttles when hidden — ignore
+      if (last) {
+        acc += t - last; frames++;
+        if (acc >= 1000) {                                    // evaluate one ~1s window at a time
+          const fps = (frames * 1000) / acc;
+          badSecs = fps < 45 ? badSecs + 1 : 0;               // reset on any good second (avoids false positives)
+          acc = 0; frames = 0; secs++;
+          if (badSecs >= 2) { runtimeWeak = true; html.classList.add("lite"); return; }  // 2 bad seconds in a row -> go lite
+          if (secs >= 12) { armed = false; return; }          // stop watching after ~12s if all is well
+        }
+      }
+      last = t;
+      requestAnimationFrame(watch);
     };
-    // start after the initial load burst so first-paint jank doesn't cause a false downgrade
-    setTimeout(() => requestAnimationFrame(sample), 900);
+    // start after the load burst; monitor spans the first interactions/scroll (where jank shows most)
+    setTimeout(() => requestAnimationFrame(watch), 600);
+    // if it already stopped, give it one more look on the first real scroll
+    addEventListener("scroll", () => {
+      if (armed || isLite()) return;
+      armed = true; last = 0; acc = 0; frames = 0; badSecs = 0; secs = 9;
+      requestAnimationFrame(watch);
+    }, { passive: true, once: true });
   }
 
   /* ---- Init ---- */

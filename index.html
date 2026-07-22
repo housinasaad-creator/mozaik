@@ -19,7 +19,9 @@
        not just phones. Strong machines are untouched and keep the full experience. */
     (function () {
       var d = document.documentElement;
-      var weak =
+      var q = location.search;
+      if (/[?&]full=1/.test(q)) return;                 // ?full=1 → force the full experience (testing)
+      var weak = /[?&]lite=1/.test(q) ||                // ?lite=1  → force lite mode (testing)
         (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
         (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
         (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
