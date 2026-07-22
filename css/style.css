@@ -695,3 +695,8 @@ html:not(.lite) :where(.cert, .card){
 html:not(.lite) :where(.btn:not(.btn--cta)){
   box-shadow:0 12px 28px -14px rgba(0,0,0,.55);
 }
+
+/* pop-out on hover for buttons — replaces the removed magnetic pull.
+   Cards already lift on hover via their own CSS. Strong devices only. */
+html:not(.lite) .btn:hover{ transform:translateY(-3px) scale(1.05); }
+html:not(.lite) .btn:active{ transform:translateY(-1px) scale(1.02); }
