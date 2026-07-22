@@ -9,6 +9,21 @@
   const fine    = matchMedia("(pointer:fine)").matches;
   const lerp = (a, b, n) => a + (b - a) * n;
 
+  /* ---- Capability tier ----
+     "lite" = a genuinely weak device (any screen size). Set from the <head> probe
+     (few cores / low memory / reduced-motion). A runtime FPS watchdog can also flip
+     the site into lite mode if real frame-rate is poor. In lite mode the continuously
+     animating, GPU-heavy decorations (mosaic spotlight, ambient dots, aurora, smooth-
+     scroll, blur) are dropped so scrolling and the 3D boxes stay perfectly smooth. */
+  const html = document.documentElement;
+  const LITE0 = reduced
+    || (navigator.deviceMemory && navigator.deviceMemory <= 4)
+    || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
+    || html.classList.contains("lite");
+  if (LITE0) html.classList.add("lite");
+  let runtimeWeak = false;
+  const isLite = () => LITE0 || runtimeWeak || html.classList.contains("lite");
+
   /* ---- i18n ---- */
   const DICT = window.MOZAIK_I18N || {};
   const setYear = () => { const y = $("#year"); if (y) y.textContent = new Date().getFullYear(); };
@@ -32,7 +47,10 @@
   const shroud = $("#shroud"), dot = $("#cursorDot"), ring = $("#cursorRing");
   let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, raf = null;
   function loop() {
-    shroud.style.setProperty("--mx", mx + "px"); shroud.style.setProperty("--my", my + "px");
+    // Spotlight shroud repaints a full-screen radial gradient every mouse move — the single
+    // most expensive cursor effect on weak GPUs. Skip it in lite mode (shroud is hidden via CSS);
+    // the lightweight custom cursor dot/ring still follow the pointer.
+    if (!isLite()) { shroud.style.setProperty("--mx", mx + "px"); shroud.style.setProperty("--my", my + "px"); }
     dot.style.transform = `translate3d(${mx}px,${my}px,0)`;
     rx = lerp(rx, mx, 0.22); ry = lerp(ry, my, 0.22);
     ring.style.transform = `translate3d(${rx}px,${ry}px,0)`;
@@ -49,7 +67,7 @@
   } else { shroud.style.setProperty("--mx", "50%"); shroud.style.setProperty("--my", "38%"); }
 
   /* ---- Magnetic ---- */
-  if (fine && !reduced) $$("[data-magnetic]").forEach((el) => {
+  if (fine && !reduced && !LITE0) $$("[data-magnetic]").forEach((el) => {
     el.addEventListener("pointermove", (e) => {
       const r = el.getBoundingClientRect();
       el.style.transform = `translate(${((e.clientX - r.left) / r.width - .5) * 22}px,${((e.clientY - r.top) / r.height - .5) * 22}px)`;
@@ -58,7 +76,7 @@
   });
 
   /* ---- 3D tilt ---- */
-  if (fine && !reduced) $$("[data-tilt]").forEach((el) => {
+  if (fine && !reduced && !LITE0) $$("[data-tilt]").forEach((el) => {
     const inner = $("[data-tilt-inner]", el);
     el.addEventListener("pointermove", (e) => {
       const r = el.getBoundingClientRect();
@@ -138,7 +156,12 @@
           // ONLY the centred box keeps a live 3D viewer — load it, unload every other one (one WebGL context max).
           // Not gated by scroll position: the centred box stays loaded so returning to it never re-inits (no lag).
           const active = ad === 0;
-          if (active && ifr.dataset.loaded !== "1") { ifr.src = ifr.dataset.src; ifr.dataset.loaded = "1"; }
+          if (active && ifr.dataset.loaded !== "1") {
+            // show a branded loading state instead of an empty dark panel while the viewer boots
+            const view = ifr.closest(".media-view");
+            if (view) { view.classList.add("is-loading"); ifr.addEventListener("load", () => view.classList.remove("is-loading"), { once: true }); }
+            ifr.src = ifr.dataset.src; ifr.dataset.loaded = "1";
+          }
           else if (!active && ifr.dataset.loaded === "1") { ifr.src = "about:blank"; ifr.dataset.loaded = "0"; }
           ifr.style.visibility = active ? "visible" : "hidden";
           ifr.style.pointerEvents = active ? "auto" : "none";
@@ -169,7 +192,7 @@
   (function () {
     const canvas = document.querySelector(".dots-fx");
     if (!canvas) return;
-    if (matchMedia("(max-width:820px)").matches) { canvas.style.display = "none"; return; }  // phones: skip animation entirely (perf)
+    if (matchMedia("(max-width:820px)").matches || isLite()) { canvas.style.display = "none"; return; }  // phones + weak devices: skip animation entirely (perf)
     const ctx = canvas.getContext("2d");
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     const GAP = 38, SPEED = 0.2, OY0 = GAP / 2;   // SPEED = gentle downward drift
@@ -220,7 +243,8 @@
       }
       if (--cool <= 0) { spawn(); cool = 48 + (Math.random() * 70 | 0); }
     }
-    function loop() { frame(); requestAnimationFrame(loop); }
+    // Stop the ambient loop the moment the runtime watchdog flips the site into lite mode.
+    function loop() { if (isLite()) { canvas.style.display = "none"; return; } frame(); requestAnimationFrame(loop); }
     if (reduced) frame(); else loop();
   })();
 
@@ -242,6 +266,19 @@
       if (heroInView) tryPlay(); else heroVid.pause();
     }), { threshold: 0.05 }).observe(heroSec);
   }
+
+  /* ---- Pause any live 3D box viewer while its iframe is scrolled off-screen ----
+     The active WebGL box otherwise keeps rendering (and slowly auto-rotating) forever, even
+     when you've scrolled far past the products/catalogue — burning GPU and battery the whole
+     time. We message the viewer to pause when it leaves the viewport and resume when it returns.
+     The viewer also pauses itself when the browser tab is hidden. Big win on weak devices. */
+  (function () {
+    if (!("IntersectionObserver" in window)) return;
+    const io3d = new IntersectionObserver((es) => es.forEach((en) => {
+      try { const w = en.target.contentWindow; if (w) w.postMessage(en.isIntersecting ? "mzk:resume" : "mzk:pause", "*"); } catch (e) {}
+    }), { threshold: 0.01 });
+    $$(".media-iframe").forEach((f) => io3d.observe(f));
+  })();
 
   /* ---- Mobile: tap a cert/service card to flip it to its preview image (one active at a time) ---- */
   (function () {
@@ -309,7 +346,7 @@
 
   /* ---- Lenis + GSAP (desktop only — smooth-scroll rAF loops cause lag on mobile; touch uses native scroll) ---- */
   let lenis = null;
-  if (window.Lenis && !reduced && fine) {
+  if (window.Lenis && !reduced && fine && !LITE0) {
     lenis = new Lenis({ duration: 1.1, smoothWheel: true });
     if (!(window.gsap && window.ScrollTrigger)) { const r = (t) => { lenis.raf(t); requestAnimationFrame(r); }; requestAnimationFrame(r); }
     $$('a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
@@ -379,6 +416,26 @@
       close();
     });
   })();
+
+  /* ---- Runtime FPS watchdog ----
+     Some laptops report plenty of cores yet have a weak GPU. Sample the real frame-rate for a
+     short window after load; if it is clearly struggling, flip the whole site into lite mode
+     (drops the ambient dots + mosaic spotlight live, and CSS drops blur) so scrolling recovers.
+     Skipped when we are already in lite mode. */
+  if (!LITE0 && !reduced) {
+    let frames = 0, t0 = 0;
+    const sample = (t) => {
+      if (document.hidden) { t0 = 0; requestAnimationFrame(sample); return; }  // rAF throttles when tab is hidden — don't misread that as low fps
+      if (!t0) { t0 = t; frames = 0; requestAnimationFrame(sample); return; }
+      frames++;
+      const elapsed = t - t0;
+      if (elapsed < 1400) { requestAnimationFrame(sample); return; }
+      const fps = (frames * 1000) / elapsed;
+      if (fps < 38) { runtimeWeak = true; html.classList.add("lite"); }   // sustained low fps -> go lite
+    };
+    // start after the initial load burst so first-paint jank doesn't cause a false downgrade
+    setTimeout(() => requestAnimationFrame(sample), 900);
+  }
 
   /* ---- Init ---- */
   applyLang(savedLang);

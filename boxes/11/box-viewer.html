@@ -151,7 +151,8 @@
       /* ---------- renderer ---------- */
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));  // render res 1.5x on all devices (phones match desktop for crisp boxes)
+      var __mzkWeak = (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || matchMedia("(prefers-reduced-motion: reduce)").matches;
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, __mzkWeak ? 1 : 1.5));  // weak devices render at 1x (big GPU saving); strong devices stay crisp at 1.5x
       renderer.shadowMap.enabled = false;   // ground shadow removed (perf: no shadow-map pass)
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
@@ -601,8 +602,11 @@
       resetIdle();
 
       /* ---------- loop ---------- */
+      addEventListener("message", function (e) { if (e.data === "mzk:pause") window.__mzkPaused = true; else if (e.data === "mzk:resume") window.__mzkPaused = false; });
+      document.addEventListener("visibilitychange", function () { window.__mzkPaused = document.hidden; });
       (function animate() {
         requestAnimationFrame(animate);
+        if (window.__mzkPaused) return;
         if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
         if (Math.abs(liftTarget - lift) > 0.0005) {
           lift += (liftTarget - lift) * 0.09;
