@@ -682,3 +682,16 @@ html:not(.lite) :is(.cert,.card,.client,.testi,.infocard,.location__map,.cta-ban
 html:not(.lite) :is(.cert,.card,.client,.testi,.infocard,.location__map,.cta-band__inner,.pcarousel .pcard):hover::after{
   opacity:1; animation:mzkframe 6s linear infinite;
 }
+
+/* =========================================================
+   RESTING SHADOWS — give the flat cards + plain buttons real depth.
+   STRONG devices only (html:not(.lite)); weak devices stay flat & fast.
+   :where() keeps specificity at 0 so every existing :hover shadow still wins,
+   and the CTA button keeps its own gold glow (excluded below).
+   ========================================================= */
+html:not(.lite) :where(.cert, .card){
+  box-shadow:0 22px 48px -26px rgba(0,0,0,.75), 0 0 0 1px rgba(var(--accent-rgb),.08);
+}
+html:not(.lite) :where(.btn:not(.btn--cta)){
+  box-shadow:0 12px 28px -14px rgba(0,0,0,.55);
+}

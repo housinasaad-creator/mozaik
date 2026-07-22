@@ -66,26 +66,10 @@
     document.addEventListener("pointerleave", () => { dot.style.display="none"; ring.style.display="none"; });
   } else { shroud.style.setProperty("--mx", "50%"); shroud.style.setProperty("--my", "38%"); }
 
-  /* ---- Magnetic ---- */
-  if (fine && !reduced && !LITE0) $$("[data-magnetic]").forEach((el) => {
-    el.addEventListener("pointermove", (e) => {
-      const r = el.getBoundingClientRect();
-      el.style.transform = `translate(${((e.clientX - r.left) / r.width - .5) * 22}px,${((e.clientY - r.top) / r.height - .5) * 22}px)`;
-    });
-    el.addEventListener("pointerleave", () => { el.style.transform = ""; });
-  });
-
-  /* ---- 3D tilt ---- */
-  if (fine && !reduced && !LITE0) $$("[data-tilt]").forEach((el) => {
-    const inner = $("[data-tilt-inner]", el);
-    el.addEventListener("pointermove", (e) => {
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-      el.style.transform = `perspective(900px) rotateY(${x * 7}deg) rotateX(${-y * 7}deg)`;
-      if (inner) inner.style.transform = `translateZ(50px) translate(${x * 14}px,${y * 14}px)`;
-    });
-    el.addEventListener("pointerleave", () => { el.style.transform = ""; if (inner) inner.style.transform = ""; });
-  });
+  /* ---- Magnetic buttons & 3D card tilt: intentionally disabled ----
+     These followed the cursor (translate / perspective-rotate on pointermove).
+     Removed for a calmer, more premium feel — nothing chases the mouse now.
+     The data-magnetic / data-tilt attributes stay in the HTML but do nothing. */
 
   /* ---- Media tabs: 3D <-> Video ---- */
   $$("[data-media]").forEach((m) => {
