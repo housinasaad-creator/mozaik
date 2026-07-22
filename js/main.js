@@ -258,10 +258,31 @@
      The viewer also pauses itself when the browser tab is hidden. Big win on weak devices. */
   (function () {
     if (!("IntersectionObserver" in window)) return;
+    const inView = new Set();
+    let scrolling = false, sT = 0;
+    const post = (f, msg) => { try { const w = f.contentWindow; if (w) w.postMessage(msg, "*"); } catch (e) {} };
+    const pauseAll = () => $$(".media-iframe").forEach((f) => post(f, "mzk:pause"));
+    const resumeVisible = () => inView.forEach((f) => post(f, "mzk:resume"));
+
+    // track which viewers are on screen; render them only when NOT scrolling
     const io3d = new IntersectionObserver((es) => es.forEach((en) => {
-      try { const w = en.target.contentWindow; if (w) w.postMessage(en.isIntersecting ? "mzk:resume" : "mzk:pause", "*"); } catch (e) {}
+      if (en.isIntersecting) { inView.add(en.target); if (!scrolling) post(en.target, "mzk:resume"); }
+      else { inView.delete(en.target); post(en.target, "mzk:pause"); }
     }), { threshold: 0.01 });
     $$(".media-iframe").forEach((f) => io3d.observe(f));
+
+    // Freeze every 3D viewer WHILE scrolling (frees the GPU/main thread so scroll stays
+    // buttery on ALL devices); resume only the on-screen ones once scrolling settles.
+    // A global flag + event let the catalog page defer booting new viewers mid-scroll too.
+    addEventListener("scroll", () => {
+      if (!scrolling) { scrolling = true; window.__mzkScrolling = true; pauseAll(); }
+      clearTimeout(sT);
+      sT = setTimeout(() => {
+        scrolling = false; window.__mzkScrolling = false;
+        resumeVisible();
+        dispatchEvent(new Event("mzk:scrollidle"));
+      }, 160);
+    }, { passive: true });
   })();
 
   /* ---- Mobile: tap a cert/service card to flip it to its preview image (one active at a time) ---- */
