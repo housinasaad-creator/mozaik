@@ -349,21 +349,19 @@
     if (!$(".testi[hidden]")) testiMoreBtn.classList.add("is-hidden");
   });
 
-  /* ---- Lenis + GSAP (desktop only — smooth-scroll rAF loops cause lag on mobile; touch uses native scroll) ---- */
+  /* ---- Smooth-scroll (Lenis) intentionally DISABLED ----
+     Its inertia made the page keep gliding for a moment after the wheel stopped.
+     Native wheel scrolling is instant and 1:1 with the mouse on every device. */
   let lenis = null;
-  if (window.Lenis && !reduced && fine && !LITE0) {
-    lenis = new Lenis({ duration: 1.1, smoothWheel: true });
-    if (!(window.gsap && window.ScrollTrigger)) { const r = (t) => { lenis.raf(t); requestAnimationFrame(r); }; requestAnimationFrame(r); }
-    $$('a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
-      const id = a.getAttribute("href"); if (id.length < 2) return; const el = $(id); if (!el) return;
-      e.preventDefault(); lenis.scrollTo(el, { offset: -70 });
-    }));
-  }
+  // nav/anchor links still jump to the right section, offset below the sticky nav
+  $$('a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
+    const id = a.getAttribute("href"); if (id.length < 2) return; const el = $(id); if (!el) return;
+    e.preventDefault();
+    scrollTo({ top: el.getBoundingClientRect().top + scrollY - 70, behavior: reduced ? "auto" : "smooth" });
+  }));
   if (window.gsap && window.ScrollTrigger && !reduced) {
-    gsap.registerPlugin(ScrollTrigger);
-    if (lenis) { lenis.on("scroll", ScrollTrigger.update); const drive = (t) => lenis.raf(t * 1000);
-      gsap.ticker.add(drive); gsap.ticker.lagSmoothing(0); window.__pauseMotion = () => { gsap.ticker.remove(drive); gsap.globalTimeline.pause(); }; }
-    // (product cards are now a carousel — see the Products carousel block below)
+    gsap.registerPlugin(ScrollTrigger);   // ScrollTrigger syncs to native scroll on its own — no Lenis driver needed
+    window.__pauseMotion = () => { try { gsap.globalTimeline.pause(); } catch (e) {} };
   }
 
   /* ---- Floating scroll-to-top button (colors follow the active theme) ---- */
