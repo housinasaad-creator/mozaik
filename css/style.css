@@ -696,7 +696,14 @@ html:not(.lite) :where(.btn:not(.btn--cta)){
   box-shadow:0 12px 28px -14px rgba(0,0,0,.55);
 }
 
-/* pop-out on hover for buttons — replaces the removed magnetic pull.
-   Cards already lift on hover via their own CSS. Strong devices only. */
+/* pop-out on hover for buttons — replaces the removed magnetic pull. Strong devices only. */
 html:not(.lite) .btn:hover{ transform:translateY(-3px) scale(1.05); }
 html:not(.lite) .btn:active{ transform:translateY(-1px) scale(1.02); }
+
+/* cards DON'T lift on their own: .reveal.is-in forces transform:none at equal
+   specificity (and later in the file), cancelling the plain .card:hover lift —
+   the old "pop" actually came from the JS tilt we removed. Re-assert the hover
+   lift with a higher-specificity rule so cards visibly enlarge again. Strong only. */
+html:not(.lite) :is(.cert,.card,.testi,.client,.infocard):hover{
+  transform:translateY(-8px) scale(1.04);
+}
