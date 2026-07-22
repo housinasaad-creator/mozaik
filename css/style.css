@@ -646,3 +646,40 @@ html.lite .scroll-hint,
 html.lite .spin3d{ animation:none !important; }
 /* keep the scroll reveal (it's cheap) but snappier so nothing feels laggy */
 html.lite .reveal{ transition-duration:.45s; }
+
+/* =========================================================
+   GOLD CARD FRAMES — clear champagne-gold border + soft shadow + a slow
+   rotating gold sheen that travels around the frame.
+   STRONG devices only (html:not(.lite)); weak devices keep the flat, light
+   look for maximum smoothness. Off-screen sections use content-visibility, so
+   only the cards actually on screen ever animate.
+   ========================================================= */
+@property --mzk-a{ syntax:"<angle>"; inherits:false; initial-value:0deg; }
+@keyframes mzkframe{ to{ --mzk-a:360deg; } }
+
+html:not(.lite) :is(.cert,.card,.client,.testi,.infocard,.location__map,.cta-band__inner,.pcarousel .pcard){
+  position:relative;
+  border:1px solid rgba(var(--accent-rgb),.5);
+  box-shadow:0 20px 46px -22px rgba(0,0,0,.72), 0 0 0 1px rgba(var(--accent-rgb),.16), inset 0 1px 0 rgba(255,255,255,.05);
+}
+/* the travelling gold arc — a masked ring so only the ~1.5px border shows */
+html:not(.lite) :is(.cert,.card,.client,.testi,.infocard,.location__map,.cta-band__inner,.pcarousel .pcard)::after{
+  content:""; position:absolute; inset:0; border-radius:inherit; padding:.75px; z-index:1; pointer-events:none;
+  background:conic-gradient(from var(--mzk-a),
+    rgba(var(--accent-rgb),.28) 0deg,
+    rgba(var(--accent-rgb),.28) 206deg,
+    rgba(var(--accent-soft-rgb),.95) 220deg,
+    var(--accent-soft) 232deg,
+    rgba(var(--accent-soft-rgb),.95) 244deg,
+    rgba(var(--accent-rgb),.28) 258deg,
+    rgba(var(--accent-rgb),.28) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+          mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite:exclude;
+  animation:mzkframe 6s linear infinite;
+}
+/* lift + brighten the gold on hover (kept above the base rule's specificity) */
+html:not(.lite) :is(.cert,.card,.client,.testi,.infocard,.cta-band__inner,.pcarousel .pcard):hover{
+  box-shadow:0 30px 64px -22px rgba(0,0,0,.8), 0 0 0 1px rgba(var(--accent-rgb),.5), 0 10px 40px -12px rgba(var(--accent-rgb),.45);
+}
