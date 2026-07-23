@@ -2,19 +2,14 @@
     html, body { width: 100%; height: 100%; }
     html, body { touch-action: none; overscroll-behavior: none; }
     body {
-      /* Premium product-studio backdrop (site palette: deep navy + a whisper of gold):
-         (1) a small, soft warm key-light right behind the box — a subtle brand hint, not a puddle,
-         (2) a clean navy "sweep" lit softly from the upper centre, deepening to near-black at the edges. */
+      /* Quiet-luxury product studio — same DNA as the site (--bg / --bg-2), no gold puddle.
+         Soft cool key-light lifts the box; edges fall to near-black so the product is the hero. */
       background:
-        radial-gradient(30% 24% at 50% 42%,
-          rgba(201,166,89,0.22) 0%,
-          rgba(201,166,89,0.08) 45%,
-          rgba(201,166,89,0.00) 72%),
-        radial-gradient(140% 108% at 50% 18%,
-          #1d2b50 0%,
-          #142244 38%,
-          #0c1730 66%,
-          #060c1c 100%);
+        radial-gradient(72% 58% at 50% 44%,
+          #1a2d58 0%,
+          #12244a 38%,
+          #0c1836 68%,
+          #070e20 100%);
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       cursor: grab;
