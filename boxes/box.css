@@ -2,19 +2,18 @@
     html, body { width: 100%; height: 100%; }
     html, body { touch-action: none; overscroll-behavior: none; }
     body {
-      /* warm GOLD glow at the centre (behind the box) fading through muted tones
-         into deep navy at the edges — mirrors the brand glow used on the logo */
+      /* a REAL, wide gradient: solid gold at the centre (never white) easing all the
+         way out to deep navy at the edges — mirrors the brand glow used on the logo */
       background:
-        radial-gradient(85% 70% at 50% 47%,
-          #f4dcaa 0%,
-          #dcb46e 3%,
-          #8f7346 7%,
-          #2c3757 13%,
-          #1a2640 22%,
-          #111b32 38%,
-          #0a1122 60%,
-          #050813 83%,
-          #010204 100%);
+        radial-gradient(95% 80% at 50% 46%,
+          #e8c589 0%,
+          #c9a05f 15%,
+          #9c824c 29%,
+          #6a6a56 42%,
+          #3f4a63 55%,
+          #26314e 68%,
+          #161f37 82%,
+          #070b16 100%);
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       cursor: grab;
