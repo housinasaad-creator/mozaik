@@ -325,7 +325,9 @@ html[dir="rtl"] .timeline__flow .jstory:has(.jhead){ padding:1.15rem calc(56px +
 .catalog-item{ padding:clamp(2.5rem,7vh,5.5rem) 0; }
 .catalog-item__inner{ display:flex; flex-direction:column; gap:clamp(1.6rem,3.5vw,2.6rem); align-items:center; }
 .catalog-item__text{ order:0; text-align:center; max-width:78ch; }
-.catalog-item__viewer{ order:1; width:100%; padding:1rem; overflow:hidden; }
+.catalog-item__viewer{ order:1; width:100%; padding:1rem; overflow:hidden;
+  border:1px solid rgba(var(--accent-rgb),.42);
+  box-shadow:0 30px 70px -34px rgba(0,0,0,.85), 0 0 0 1px rgba(var(--accent-rgb),.14), inset 0 1px 0 rgba(255,255,255,.06); }
 .catalog-item .media-stage{ min-height:clamp(440px,72vh,820px); }
 .catalog-item .media-view{ background:radial-gradient(circle at 50% 42%, rgba(181,142,58,.06), transparent 60%), #0b1428; }
 .catalog-item__num{ font-family:var(--font-mono); font-weight:700; font-size:clamp(2.4rem,5.5vw,4rem); line-height:1; background:linear-gradient(160deg,var(--accent-soft),var(--accent-deep)); -webkit-background-clip:text; background-clip:text; color:transparent; display:block; margin-bottom:.5rem; }
