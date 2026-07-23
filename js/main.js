@@ -140,13 +140,13 @@
           // ONLY the centred box keeps a live 3D viewer — load it, unload every other one (one WebGL context max).
           // Not gated by scroll position: the centred box stays loaded so returning to it never re-inits (no lag).
           const active = ad === 0;
+          const view = ifr.closest(".media-view");
           if (active && ifr.dataset.loaded !== "1") {
-            // show a branded loading state instead of an empty dark panel while the viewer boots
-            const view = ifr.closest(".media-view");
-            if (view) { view.classList.add("is-loading"); ifr.addEventListener("load", () => view.classList.remove("is-loading"), { once: true }); }
+            // brand placeholder stays up while the viewer boots, then fades to reveal the live box
+            if (view) { view.classList.add("is-loading"); ifr.addEventListener("load", () => { view.classList.remove("is-loading"); view.classList.add("is-live"); }, { once: true }); }
             ifr.src = ifr.dataset.src; ifr.dataset.loaded = "1";
           }
-          else if (!active && ifr.dataset.loaded === "1") { ifr.src = "about:blank"; ifr.dataset.loaded = "0"; }
+          else if (!active && ifr.dataset.loaded === "1") { ifr.src = "about:blank"; ifr.dataset.loaded = "0"; if (view) view.classList.remove("is-live", "is-loading"); }
           ifr.style.visibility = active ? "visible" : "hidden";
           ifr.style.pointerEvents = active ? "auto" : "none";
         }
@@ -256,6 +256,18 @@
      when you've scrolled far past the products/catalogue — burning GPU and battery the whole
      time. We message the viewer to pause when it leaves the viewport and resume when it returns.
      The viewer also pauses itself when the browser tab is hidden. Big win on weak devices. */
+  // Drop a MOZAIK brand placeholder into every 3D panel — it shows until the live
+  // viewer boots (and again whenever a viewer unloads), so no panel is ever an empty void.
+  (function () {
+    $$(".media-view--3d").forEach((v) => {
+      if (v.querySelector(".media-3d-ph")) return;
+      const ph = document.createElement("div");
+      ph.className = "media-3d-ph"; ph.setAttribute("aria-hidden", "true");
+      ph.innerHTML = '<img src="assets/mozaik-logo-colored.png" alt="" />';
+      v.appendChild(ph);
+    });
+  })();
+
   (function () {
     if (!("IntersectionObserver" in window)) return;
     const inView = new Set();
