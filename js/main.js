@@ -50,21 +50,22 @@
     // Spotlight shroud repaints a full-screen radial gradient every mouse move — the single
     // most expensive cursor effect on weak GPUs. Skip it in lite mode (shroud is hidden via CSS);
     // the lightweight custom cursor dot/ring still follow the pointer.
-    if (!isLite()) { shroud.style.setProperty("--mx", mx + "px"); shroud.style.setProperty("--my", my + "px"); }
-    dot.style.transform = `translate3d(${mx}px,${my}px,0)`;
+    if (shroud && !isLite()) { shroud.style.setProperty("--mx", mx + "px"); shroud.style.setProperty("--my", my + "px"); }
+    if (dot) dot.style.transform = `translate3d(${mx}px,${my}px,0)`;
     rx = lerp(rx, mx, 0.22); ry = lerp(ry, my, 0.22);
-    ring.style.transform = `translate3d(${rx}px,${ry}px,0)`;
+    if (ring) ring.style.transform = `translate3d(${rx}px,${ry}px,0)`;
     raf = (Math.abs(rx - mx) > 0.3 || Math.abs(ry - my) > 0.3) ? requestAnimationFrame(loop) : null;
   }
   if (fine && !reduced) {
-    addEventListener("pointermove", (e) => { mx = e.clientX; my = e.clientY; dot.style.display="block"; ring.style.display="block"; if (!raf) raf = requestAnimationFrame(loop); }, { passive: true });
+    addEventListener("pointermove", (e) => { mx = e.clientX; my = e.clientY; if (dot) dot.style.display="block"; if (ring) ring.style.display="block"; if (!raf) raf = requestAnimationFrame(loop); }, { passive: true });
     document.addEventListener("pointerover", (e) => {
+      if (!ring) return;
       const t = e.target.closest("[data-cursor]");
       ring.classList.toggle("is-hover", !!t && t.dataset.cursor === "link");
       ring.classList.toggle("is-cta", !!t && t.dataset.cursor === "cta");
     });
-    document.addEventListener("pointerleave", () => { dot.style.display="none"; ring.style.display="none"; });
-  } else { shroud.style.setProperty("--mx", "50%"); shroud.style.setProperty("--my", "38%"); }
+    document.addEventListener("pointerleave", () => { if (dot) dot.style.display="none"; if (ring) ring.style.display="none"; });
+  } else if (shroud) { shroud.style.setProperty("--mx", "50%"); shroud.style.setProperty("--my", "38%"); }
 
   /* ---- Magnetic buttons & 3D card tilt: intentionally disabled ----
      These followed the cursor (translate / perspective-rotate on pointermove).
