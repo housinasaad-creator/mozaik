@@ -361,7 +361,7 @@ html[dir="rtl"] .timeline__flow .jstory:has(.jhead){ padding:1.15rem calc(56px +
    or the brief moment mid-scroll before a box boots). Turns any empty/booting panel into
    an intentional, premium brand moment instead of a dark void. */
 .media-3d-ph{ position:absolute; inset:0; z-index:2; display:grid; place-items:center;
-  opacity:1; transition:opacity .55s ease; pointer-events:none; }
+  opacity:1; transition:opacity .2s ease; pointer-events:none; }
 .media-3d-ph::before{ content:""; position:absolute; width:62%; aspect-ratio:1; border-radius:50%;
   background:radial-gradient(circle, rgba(var(--accent-rgb),.18), transparent 68%); filter:blur(12px); }
 .media-3d-ph img{ position:relative; width:min(46%,150px); opacity:.94;
