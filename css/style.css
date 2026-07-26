@@ -84,7 +84,20 @@ h1,h2,h3{ font-family:var(--font-head); font-weight:700; line-height:1.08; lette
 .section.about,.section.quality,.section.services,.section.clients{ content-visibility:auto; contain-intrinsic-size:auto 800px; }
 /* small centred gold divider between consecutive sections */
 .section + .section::before{ content:""; position:absolute; top:0; left:50%; transform:translateX(-50%); width:64px; height:2px; border-radius:2px; pointer-events:none; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
-.grad{ background:linear-gradient(100deg,var(--accent-soft),var(--accent) 55%,var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+/* Gold gradient text — solid gold fallback first.
+   background-clip:text can briefly fail (carousel 3D / WebGL / GPU thrash) and look dark
+   until refresh; fallback color keeps it gold even when the clip glitches. */
+.grad{
+  color:var(--accent-soft);
+  background-image:linear-gradient(100deg,var(--accent-soft),var(--accent) 55%,var(--accent2));
+  -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent;
+  transform:translateZ(0);
+  isolation:isolate;
+}
+@supports not ((-webkit-background-clip:text) or (background-clip:text)){
+  .grad{ color:var(--accent-soft); -webkit-text-fill-color:var(--accent-soft); background-image:none; }
+}
 .mini-link{ color:var(--cyan-soft); font-weight:600; font-size:.9rem; font-family:var(--font-head); transition:transform .3s var(--ease); }
 .mini-link:hover{ transform:translateX(3px); }
 
@@ -286,11 +299,26 @@ html[lang="ar"] .jwheel-measure{ font-family:var(--font-body); direction:rtl; te
 .scroll-hint{ margin-top:1.6rem; color:var(--gold-soft); font-size:1.3rem; animation:hintBob 1.8s ease-in-out infinite; width:max-content; }
 @keyframes hintBob{ 0%,100%{ transform:translateY(0); opacity:.55; } 50%{ transform:translateY(10px); opacity:1; } }
 @media (max-width:860px){
-  .jwheel-stage{ padding:clamp(5rem,11vh,6.5rem) 0 6.5rem; }
-  .jflow--wheel{ width:min(92vw,620px); margin-inline:auto; height:min(52vh,420px); }
+  .jwheel-stage{
+    padding:clamp(5rem,11vh,6.5rem) 0 6.5rem;
+    display:flex; justify-content:center; align-items:center;
+  }
+  .jflow--wheel{
+    width:min(92vw,620px); margin-inline:auto; height:min(52vh,420px);
+    text-align:center;
+  }
+  .jflow--wheel .kicker,
+  .jflow--wheel .jflow-title{ text-align:center; width:100%; }
   .jwheel-scene{ top:5.2rem; }
-  .jwheel-measure{ width:min(92vw,620px); }
-  .jwheel-card{ font-size:clamp(1.02rem,3.8vw,1.22rem); }
+  .jwheel-measure{ width:min(92vw,620px); text-align:center; }
+  html[lang="ar"] .jwheel-measure{ text-align:center; }
+  .jwheel-card{
+    font-size:clamp(1.02rem,3.8vw,1.22rem);
+    text-align:center !important;
+    left:50%;
+    padding-inline:.2rem;
+  }
+  html[lang="ar"] .jwheel-card{ text-align:center !important; }
   .jpage-actions{
     inset-inline:1rem; inset-inline-start:50%; transform:translateX(-50%);
     justify-content:center; width:min(92vw,420px);
@@ -299,7 +327,7 @@ html[lang="ar"] .jwheel-measure{ font-family:var(--font-body); direction:rtl; te
   .jpage-veil{ background:linear-gradient(180deg,rgba(10,10,12,.6),rgba(10,10,12,.72)); }
 }
 @media (max-width:480px){
-  .jflow-title{ font-size:clamp(1.35rem,6vw,1.75rem); }
+  .jflow-title{ font-size:clamp(1.35rem,6vw,1.75rem); text-align:center; }
   .jpage-actions{ gap:.45rem; width:min(96vw,100%); }
   .jpage-actions .btn{ padding:.65rem .85rem; font-size:.86rem; }
 }
@@ -413,7 +441,12 @@ html[dir="rtl"] .timeline__flow .jstory:has(.jhead){ padding:1.15rem calc(56px +
 .catalog-item__viewer{ order:1; width:100%; padding:1rem; overflow:hidden; }
 .catalog-item .media-stage{ min-height:clamp(440px,72vh,820px); }
 .catalog-item .media-view{ background:radial-gradient(circle at 50% 42%, rgba(181,142,58,.06), transparent 60%), #0b1428; }
-.catalog-item__num{ font-family:var(--font-mono); font-weight:700; font-size:clamp(2.4rem,5.5vw,4rem); line-height:1; background:linear-gradient(160deg,var(--accent-soft),var(--accent-deep)); -webkit-background-clip:text; background-clip:text; color:transparent; display:block; margin-bottom:.5rem; }
+.catalog-item__num{
+  font-family:var(--font-mono); font-weight:700; font-size:clamp(2.4rem,5.5vw,4rem); line-height:1;
+  display:block; margin-bottom:.5rem;
+  color:var(--accent-soft); -webkit-text-fill-color:var(--accent-soft);
+  background:none; opacity:.92;
+}
 .catalog-item__text h2{ font-size:clamp(1.7rem,3.6vw,2.7rem); margin-bottom:1rem; }
 .catalog-item__lead{ color:var(--text-dim); font-size:1.12rem; line-height:1.95; max-width:74ch; margin-inline:auto; }
 
@@ -422,7 +455,12 @@ html[dir="rtl"] .timeline__flow .jstory:has(.jhead){ padding:1.15rem calc(56px +
 .stack__card{ padding:1.5rem 0; }
 .pcard{ padding:clamp(1.4rem,3vw,2.2rem); overflow:hidden; border-color:var(--stroke-2); display:flex; flex-direction:column; gap:1.4rem; }
 .pcard__head{ display:grid; grid-template-columns:auto 1fr auto; gap:clamp(1rem,3vw,1.8rem); align-items:center; }
-.pcard__num{ font-family:var(--font-mono); font-weight:700; font-size:clamp(2.6rem,6vw,4rem); line-height:1; background:linear-gradient(160deg,var(--cyan),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-stroke:1px rgba(var(--accent-rgb),.18); }
+/* Solid gold — NOT background-clip. Clip breaks inside 3D-transformed carousel cards. */
+.pcard__num{
+  font-family:var(--font-mono); font-weight:700; font-size:clamp(2.6rem,6vw,4rem); line-height:1;
+  color:var(--accent-soft); -webkit-text-fill-color:var(--accent-soft);
+  background:none; -webkit-text-stroke:0; opacity:.9;
+}
 .pcard__titles h3{ font-size:clamp(1.4rem,3vw,2.1rem); margin-bottom:.4rem; }
 .pcard__titles p{ color:var(--text-dim); max-width:52ch; font-size:.98rem; }
 .chips{ display:flex; flex-wrap:wrap; gap:.5rem; align-content:center; }
