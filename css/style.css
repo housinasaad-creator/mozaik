@@ -71,14 +71,14 @@ body::before{ content:""; position:fixed; inset:0; z-index:0; pointer-events:non
     radial-gradient(circle at 1px 1px, rgba(120,175,225,.07) 1px, transparent 1.7px) 7px 21px / 28px 28px,
     radial-gradient(circle at 1px 1px, rgba(236,100,162,.05) 1px, transparent 1.7px) 21px 7px / 28px 28px,
     radial-gradient(120% 90% at 50% 0%, rgba(201,166,89,.07), transparent 58%); }
-/* Homepage: same static white/CMYK dots above the mosaic shroud so they stay visible */
+/* Homepage: soft static dots above mosaic — kept faint so text stays crisp */
 .dots-static{
-  position:fixed; inset:0; z-index:2; pointer-events:none;
+  position:fixed; inset:0; z-index:2; pointer-events:none; opacity:.45;
   background:
-    radial-gradient(circle at 1px 1px, rgba(228,232,242,.16) 1px, transparent 1.7px) 0 0 / 28px 28px,
-    radial-gradient(circle at 1px 1px, rgba(201,166,89,.1) 1px, transparent 1.7px) 14px 14px / 28px 28px,
-    radial-gradient(circle at 1px 1px, rgba(120,175,225,.07) 1px, transparent 1.7px) 7px 21px / 28px 28px,
-    radial-gradient(circle at 1px 1px, rgba(236,100,162,.05) 1px, transparent 1.7px) 21px 7px / 28px 28px;
+    radial-gradient(circle at 1px 1px, rgba(228,232,242,.1) 1px, transparent 1.7px) 0 0 / 28px 28px,
+    radial-gradient(circle at 1px 1px, rgba(201,166,89,.06) 1px, transparent 1.7px) 14px 14px / 28px 28px,
+    radial-gradient(circle at 1px 1px, rgba(120,175,225,.04) 1px, transparent 1.7px) 7px 21px / 28px 28px,
+    radial-gradient(circle at 1px 1px, rgba(236,100,162,.03) 1px, transparent 1.7px) 21px 7px / 28px 28px;
 }
 @media (pointer:fine){ body{ cursor:none; } }
 img{ max-width:100%; display:block; }
