@@ -256,7 +256,9 @@ html[lang="ar"] .kicker{ letter-spacing:.08em; }
   -webkit-transform-style:preserve-3d; transform-style:preserve-3d;
 }
 .jflow--wheel{
-  position:relative; width:min(62vw,820px); margin-inline-start:clamp(1.2rem,3.5vw,4.5rem);
+  position:relative; width:min(56vw,760px);
+  /* sit further right on desktop so RTL line ends aren't clipped at the left edge */
+  margin-inline-start:clamp(3rem,10vw,8.5rem);
   height:min(58vh,480px); pointer-events:none;
   -webkit-transform-style:preserve-3d; transform-style:preserve-3d;
 }
@@ -265,13 +267,15 @@ html[lang="ar"] .kicker{ letter-spacing:.08em; }
 .jwheel-scene{
   position:absolute; left:0; right:0; top:4.6rem; bottom:0;
   -webkit-transform-style:preserve-3d; transform-style:preserve-3d;
+  overflow:visible;
 }
 .jwheel-card{
   position:absolute; top:50%; left:50%; width:100%;
-  padding:0 .4rem; border:none; background:none; box-shadow:none;
+  box-sizing:border-box;
+  padding:0 1rem; border:none; background:none; box-shadow:none;
   -webkit-backface-visibility:hidden; backface-visibility:hidden;
   -webkit-transform-style:preserve-3d; transform-style:preserve-3d;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; overflow:visible; text-overflow:clip;
   font-family:var(--font-head); font-weight:600;
   font-size:clamp(1.12rem,1.5vw,1.42rem); line-height:1.55; color:var(--text);
   direction:ltr; text-align:left;
@@ -281,7 +285,8 @@ html[lang="ar"] .jwheel-card{
 }
 .jwheel-measure{
   position:fixed; visibility:hidden; pointer-events:none; left:0; top:0; z-index:-1;
-  width:min(62vw,820px); font-family:var(--font-head); font-weight:600;
+  width:min(56vw,760px); box-sizing:border-box; padding:0 1rem;
+  font-family:var(--font-head); font-weight:600;
   font-size:clamp(1.12rem,1.5vw,1.42rem); line-height:1.55; direction:ltr; text-align:left; white-space:normal;
 }
 html[lang="ar"] .jwheel-measure{ font-family:var(--font-body); direction:rtl; text-align:right; }

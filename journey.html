@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=37" />
+  <link rel="stylesheet" href="css/style.css?v=38" />
 </head>
 <body class="jpage">
 
@@ -162,7 +162,10 @@
       }
 
       function collectAllLines() {
-        const w = flow ? flow.clientWidth : Math.min(innerWidth * (innerWidth <= 860 ? 0.92 : 0.62), 820);
+        const w = flow ? flow.clientWidth : Math.min(innerWidth * (innerWidth <= 860 ? 0.92 : 0.56), 760);
+        // match card padding so measured wraps equal visible lines (avoids clipped words)
+        measure.style.boxSizing = "border-box";
+        measure.style.paddingInline = "1rem";
         measure.style.width = Math.max(240, w) + "px";
         const lines = [];
         storiesFromSrc().forEach((html) => {
