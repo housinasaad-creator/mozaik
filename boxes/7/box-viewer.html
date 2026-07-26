@@ -401,34 +401,35 @@
       trayGroup.add(floor);
 
       // face order [+x,-x,+y,-y,+z,-z] = [right,left,top,bottom,front,back]
-      const wI = () => cardMat(whiteTex); // interior white
-      // back wall (cyan outside = -z face)
+      // board THICKNESS edges stay CYAN so corner seams never flash a white column
+      const wI = () => cardMat(whiteTex); // interior white (inner face only)
+      const cMat = () => cardMat(cyanTex);
+      // back wall — cyan outside; only +z (inside) is white
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        wI(), wI(), wI(), wI(), cardMat(creaseInnerTex), cardMat(cyanTex)
+        cMat(), cMat(), cMat(), cMat(), cardMat(creaseInnerTex), cMat()
       ]);
       backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + T / 2);
       backWall.castShadow = backWall.receiveShadow = true;
       trayGroup.add(backWall);
 
-      // front wall (cyan + navy pattern strip on +z face)
+      // front wall — cyan + logo; only -z (inside) is white
       const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        wI(), wI(), wI(), wI(), cardMat(frontTex), cardMat(creaseInnerTex)
+        cMat(), cMat(), cMat(), cMat(), cardMat(frontTex), cardMat(creaseInnerTex)
       ]);
       frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - T / 2);
       frontWall.castShadow = frontWall.receiveShadow = true;
       trayGroup.add(frontWall);
 
-      // left wall (PINK + white Mozaik logo + navy shapes on -x face)
+      // left / right ends — cyan outside; white ONLY on the inner face
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        wI(), cardMat(cyanTex), wI(), wI(), wI(), wI()
+        wI(), cMat(), cMat(), cMat(), cMat(), cMat()
       ]);
       leftWall.position.set(-BOX_W / 2 + T / 2, BOX_H / 2 + FLOOR_T, 0);
       leftWall.castShadow = leftWall.receiveShadow = true;
       trayGroup.add(leftWall);
 
-      // right wall — the OPPOSITE end, also PINK with logo + shapes (+x face)
       const rightWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        cardMat(cyanTex), wI(), wI(), wI(), wI(), wI()
+        cMat(), wI(), cMat(), cMat(), cMat(), cMat()
       ]);
       rightWall.position.set(BOX_W / 2 - T / 2, BOX_H / 2 + FLOOR_T, 0);
       rightWall.castShadow = rightWall.receiveShadow = true;

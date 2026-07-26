@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
-  <title>Mozaik 3D Kutu Görüntüleyicisi — Teleskopik Ayakkabı Kutusu</title>
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Oluklu Taşıma Saplı Koli</title>
   <link rel="stylesheet" href="../box.css?v=28" />
 </head>
 <body>
@@ -58,8 +58,8 @@
       scene.background = null;
 
       const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-      camera.position.set(0, 4.0, 12.5);
-      camera.lookAt(0, 0.1, 0);
+      camera.position.set(0, 5.2, 16.5);
+      camera.lookAt(0, 0.35, 0);
 
       function fitToContainer() {
         const w = document.documentElement.clientWidth || innerWidth || 1280;
@@ -189,20 +189,20 @@
       const kMat = () => cardMat(kraftTex);          // kraft brown inner
 
       /* =========================================================
-         GEOMETRY — TELESCOPIC (two-piece) shoe box: a deep NAVY
-         base tray (open top) + a shallow WHITE lid that slides down
-         OVER it. Every panel is a REAL 3-LAYER corrugated board —
-         a thin printed outer liner (navy or white), a thin KRAFT
-         inner liner, and a genuine wavy fluting sheet between them
-         (real geometry, seen on every cut edge). Same board build,
-         thickness and flute as box #10.
+         GEOMETRY — telescopic corrugated CARRY carton (from box 11):
+         much LONGER navy base + white lid, kraft-brown INTERIOR and
+         kraft FLUTE, with oval finger HANDLES on both short ends.
          ========================================================= */
-      const BW = 3.4, BH = 1.15, BD = 2.0;   // base: width(x), height(y), depth(z) — long shoe box
+      const BW = 2.75, BH = 2.55, BD = 2.05;  // near-square front face (width ≈ height)
+      const LID_H = 0.62;                     // lid skirt height (declared early for handle alignment)
       const tL  = 0.004;                     // liner thickness (very thin, per side)
       const gap = 0.024;                     // flute gap between the two liners
       const TC  = 2 * tL + gap;              // total board thickness (~0.032 — very thin)
       const amp = gap * 0.5 * 0.92;          // flute wave amplitude (deep, nearly liner-to-liner)
       const per = 0.055;                     // flute pitch (tight waves = real corrugation feel)
+      // rounded-rect finger handles (shared by base ends + lid end skirts)
+      const HAND_W = 0.62, HAND_H = 0.22, HAND_R = 0.07;
+      const HAND_Y_BASE = BH / 2 - LID_H / 2; // aligns with lid-skirt mid when closed
 
       /* faces order for BoxGeometry mats: [+x, -x, +y, -y, +z, -z] */
       function boxMesh(w, h, d, mats) {
@@ -214,48 +214,135 @@
       const kraftEdgeTex = plainPanel(1024, 256, KRAFT, 0.55);   // flute sheet colour
       const SHOW_FLUTE = true;
 
+      /* rounded rectangle path centred at (cx, cy) — for die-cut hand holes */
+      function roundedRectPath(cx, cy, rw, rh, rad) {
+        const path = new THREE.Path();
+        const x = cx - rw / 2, y = cy - rh / 2;
+        const r = Math.min(rad, rw / 2, rh / 2);
+        path.moveTo(x + r, y);
+        path.lineTo(x + rw - r, y);
+        path.absarc(x + rw - r, y + r, r, -Math.PI / 2, 0, false);
+        path.lineTo(x + rw, y + rh - r);
+        path.absarc(x + rw - r, y + rh - r, r, 0, Math.PI / 2, false);
+        path.lineTo(x + r, y + rh);
+        path.absarc(x + r, y + rh - r, r, Math.PI / 2, Math.PI, false);
+        path.lineTo(x, y + r);
+        path.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+        return path;
+      }
+      function roundedRectShape(cx, cy, rw, rh, rad) {
+        const s = new THREE.Shape();
+        const x = cx - rw / 2, y = cy - rh / 2;
+        const r = Math.min(rad, rw / 2, rh / 2);
+        s.moveTo(x + r, y);
+        s.lineTo(x + rw - r, y);
+        s.absarc(x + rw - r, y + r, r, -Math.PI / 2, 0, false);
+        s.lineTo(x + rw, y + rh - r);
+        s.absarc(x + rw - r, y + rh - r, r, 0, Math.PI / 2, false);
+        s.lineTo(x + r, y + rh);
+        s.absarc(x + r, y + rh - r, r, Math.PI / 2, Math.PI, false);
+        s.lineTo(x, y + r);
+        s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+        return s;
+      }
+
+      /* panel outline (+ optional rounded-rect finger-handle hole) in local XY */
+      function boardShape(w, h, handY) {
+        const s = new THREE.Shape();
+        s.moveTo(-w / 2, -h / 2);
+        s.lineTo( w / 2, -h / 2);
+        s.lineTo( w / 2,  h / 2);
+        s.lineTo(-w / 2,  h / 2);
+        s.closePath();
+        if (handY != null) {
+          s.holes.push(roundedRectPath(0, handY, HAND_W, HAND_H, HAND_R));
+        }
+        return s;
+      }
+
+      /* kraft rim around a finger-handle cut so the flute edge reads brown */
+      function handleRim(handY) {
+        const pad = 0.014;
+        const rim = roundedRectShape(0, handY, HAND_W + pad * 2, HAND_H + pad * 2, HAND_R + pad);
+        rim.holes.push(roundedRectPath(0, handY, HAND_W, HAND_H, HAND_R));
+        const geo = new THREE.ExtrudeGeometry(rim, {
+          depth: TC * 0.92, bevelEnabled: false, curveSegments: 20
+        });
+        geo.translate(0, 0, -TC * 0.46);
+        const m = new THREE.Mesh(geo, kMat());
+        m.castShadow = m.receiveShadow = true;
+        return m;
+      }
+
       /* a flat corrugated board in the local XY plane, thickness along +z,
          OUTER (printed) face toward +z, INNER (kraft) toward -z.
-         skinMat = the solid colour of the outer liner (white for lid, navy for base):
-         it paints the outer liner's thin edges so folded corners read that colour. */
-      function corrugatedBoard(w, h, faceMat, skinMat) {
+         handY = local Y of oval finger hole (null = solid panel). */
+      function corrugatedBoard(w, h, faceMat, skinMat, handY) {
         const g = new THREE.Group();
         const skin = skinMat || wMat;
 
-        // OUTER liner — printed face (+z); thin edges = skin colour.
-        const outer = boxMesh(w, h, tL, [skin(), skin(), skin(), skin(), faceMat, skin()]);
-        outer.position.z = TC / 2 - tL / 2;
-        g.add(outer);
+        if (handY == null) {
+          // OUTER liner — printed face (+z); thin edges = skin colour.
+          const outer = boxMesh(w, h, tL, [skin(), skin(), skin(), skin(), faceMat, skin()]);
+          outer.position.z = TC / 2 - tL / 2;
+          g.add(outer);
 
-        // INNER liner — WHITE interior surface (-z, faces into the box) so the
-        // inside of the box reads pure white. Every cut EDGE and the hidden (+z)
-        // face = skin colour, so no brown/kraft shows anywhere.
-        const inner = boxMesh(w, h, tL, [skin(), skin(), skin(), skin(), skin(), wMat()]);
-        inner.position.z = -(TC / 2 - tL / 2);
-        g.add(inner);
+          // INNER liner — KRAFT interior (-z)
+          const inner = boxMesh(w, h, tL, [skin(), skin(), skin(), skin(), skin(), kMat()]);
+          inner.position.z = -(TC / 2 - tL / 2);
+          g.add(inner);
+        } else {
+          // liners with die-cut oval handle
+          const shape = boardShape(w, h, handY);
+          const mkLiner = (z, mats) => {
+            const geo = new THREE.ExtrudeGeometry(shape, {
+              depth: tL, bevelEnabled: false, curveSegments: 28
+            });
+            // Extrude +z; remap so +z face uses faceMat slot via Mesh with single mat groups is hard —
+            // use one material for the liner body (face for outer, kraft for inner)
+            const mesh = new THREE.Mesh(geo, mats);
+            mesh.position.z = z;
+            mesh.castShadow = mesh.receiveShadow = true;
+            return mesh;
+          };
+          g.add(mkLiner(TC / 2 - tL, faceMat));   // outer printed
+          g.add(mkLiner(-(TC / 2), kMat()));       // inner kraft
+          g.add(handleRim(handY));
+        }
 
-        // FLUTE — real wavy kraft sheet between the liners (mimics corrugation).
+        // FLUTE — wavy KRAFT sheet between the liners (bands above/below a handle cut)
         if (SHOW_FLUTE) {
           const mrgX = TC * 4, mrgY = TC * 4;
           const x0 = -w / 2 + mrgX, x1 = w / 2 - mrgX, y0 = -h / 2 + mrgY, y1 = h / 2 - mrgY;
           const N = Math.max(8, Math.round((x1 - x0) / per * 2));
+          const hy0 = (handY == null ? 1e9 : handY) - HAND_H / 2 - 0.02;
+          const hy1 = (handY == null ? -1e9 : handY) + HAND_H / 2 + 0.02;
+          const bands = (handY == null)
+            ? [[y0, y1]]
+            : [[y0, hy0], [hy1, y1]].filter(function (b) { return b[1] - b[0] > 0.02; });
           const pos = [], idx = [];
-          for (let i = 0; i <= N; i++) {
-            const x = x0 + (x1 - x0) * i / N;
-            const z = amp * Math.sin((x - x0) / per * Math.PI * 2);
-            pos.push(x, y0, z,  x, y1, z);
+          bands.forEach(function (band) {
+            const by0 = band[0], by1 = band[1];
+            const base = pos.length / 3;
+            for (let i = 0; i <= N; i++) {
+              const x = x0 + (x1 - x0) * i / N;
+              const z = amp * Math.sin((x - x0) / per * Math.PI * 2);
+              pos.push(x, by0, z,  x, by1, z);
+            }
+            for (let i = 0; i < N; i++) {
+              const a = base + i * 2, b = a + 1, c = a + 2, d = a + 3;
+              idx.push(a, c, b,  b, c, d);
+            }
+          });
+          if (pos.length) {
+            const fg = new THREE.BufferGeometry();
+            fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+            fg.setIndex(idx);
+            fg.computeVertexNormals();
+            const fl = new THREE.Mesh(fg, cardMat(kraftTex));
+            fl.castShadow = fl.receiveShadow = true;
+            g.add(fl);
           }
-          for (let i = 0; i < N; i++) {
-            const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
-            idx.push(a, c, b,  b, c, d);
-          }
-          const fg = new THREE.BufferGeometry();
-          fg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-          fg.setIndex(idx);
-          fg.computeVertexNormals();
-          const fl = new THREE.Mesh(fg, cardMat(whiteTex));   // white flute → interior stays fully white
-          fl.castShadow = fl.receiveShadow = true;
-          g.add(fl);
         }
         return g;
       }
@@ -266,7 +353,8 @@
          lid top so the top-face perimeter shows no gap. */
       function solidBoard(w, h, faceMat, skinMat) {
         const skin = skinMat || wMat;
-        return boxMesh(w, h, TC, [skin(), skin(), skin(), skin(), faceMat, skin()]);
+        // +z printed outer, -z kraft interior (after lid rotation → underside)
+        return boxMesh(w, h, TC, [skin(), skin(), skin(), skin(), faceMat, kMat()]);
       }
 
       const boxGroup = new THREE.Group();
@@ -284,12 +372,22 @@
         if (logo) x.drawImage(logo, 0, 0, wPx, hPx);
         return toTexture(c);
       })();
-      // base long faces — white logo on navy, sitting LOW so it shows below the lid skirt
-      const baseFrontTex = imgPanel(logoW, 1480, 520, 0.52, NAVY, 0.5, 0.66);
-      const baseBackTex  = imgPanel(logoW, 1480, 520, 0.52, NAVY, 0.5, 0.66);
-      // base short faces — mosaic M mark on navy, sitting low
-      const baseSideTexL = imgPanel(mark, 900, 560, 0.24, NAVY, 0.5, 0.70);
-      const baseSideTexR = imgPanel(mark, 900, 560, 0.24, NAVY, 0.5, 0.70);
+      // base long faces — white logo on navy; canvas aspect MATCHES wall BW:BH; logo vertically centred
+      const frontHpx = 1100, frontWpx = Math.round(frontHpx * BW / BH);
+      const baseFrontTex = imgPanel(logoW, frontWpx, frontHpx, 0.48, NAVY, 0.5, 0.5);
+      const baseBackTex  = imgPanel(logoW, frontWpx, frontHpx, 0.48, NAVY, 0.5, 0.5);
+
+      // end-wall logo decal (mark / white logo) — NOT baked into ExtrudeGeometry (UVs distort)
+      const endLogoImg = mark || logoW || logo;
+      const endLogoDecalTex = (function () {
+        if (!endLogoImg) return null;
+        const lgW = endLogoImg.naturalWidth || endLogoImg.width;
+        const lgH = endLogoImg.naturalHeight || endLogoImg.height;
+        const c = document.createElement("canvas");
+        c.width = lgW; c.height = lgH;
+        c.getContext("2d").drawImage(endLogoImg, 0, 0);
+        return toTexture(c);
+      })();
 
       /* =========================================================
          BASE — navy tray: 4 walls (navy outer, kraft inner) + a
@@ -300,16 +398,39 @@
 
       (function () { const b = corrugatedBoard(BW, BH, cardMat(baseFrontTex), nMat); b.position.set(0, 0, BD / 2 - TC / 2); base.add(b); })();                        // front (+z)
       (function () { const b = corrugatedBoard(BW, BH, cardMat(baseBackTex),  nMat); b.rotation.y = Math.PI;      b.position.set(0, 0, -BD / 2 + TC / 2); base.add(b); })(); // back (-z)
-      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(baseSideTexR), nMat); b.rotation.y =  Math.PI / 2; b.position.set(BW / 2 - TC / 2, 0, 0); base.add(b); })(); // right (+x)
-      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, cardMat(baseSideTexL), nMat); b.rotation.y = -Math.PI / 2; b.position.set(-BW / 2 + TC / 2, 0, 0); base.add(b); })(); // left (-x)
+      // short ends — plain navy + handle cut; logo as a clean billboard below the hole
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, nMat(), nMat, HAND_Y_BASE); b.rotation.y =  Math.PI / 2; b.position.set(BW / 2 - TC / 2, 0, 0); base.add(b); })();
+      (function () { const b = corrugatedBoard(BD - 2 * TC, BH, nMat(), nMat, HAND_Y_BASE); b.rotation.y = -Math.PI / 2; b.position.set(-BW / 2 + TC / 2, 0, 0); base.add(b); })();
 
-      // NAVY corner posts — fill the TC×TC vertical corner column to hide the seam
-      // between adjacent base panels (same idea as the lid). Outer faces = navy so
-      // the exterior corner reads clean navy; TOP (+y) & bottom (-y) = navy so the rim
-      // corner reads navy from above (not white); inner faces = white to keep the
-      // interior white. FLUSH: no protrusion inward or outward.
+      if (endLogoDecalTex && endLogoImg) {
+        const wallW = BD - 2 * TC;
+        const endRatio = (endLogoImg.naturalHeight || endLogoImg.height) / (endLogoImg.naturalWidth || endLogoImg.width);
+        const endLogoW = wallW * 0.40;
+        const endLogoH = endLogoW * endRatio;
+        // vertically centred on the end face (below the handle clear zone)
+        const handClear = HAND_Y_BASE - HAND_H / 2 - 0.08;
+        let endLogoY = 0;
+        if (endLogoY + endLogoH / 2 > handClear) endLogoY = handClear - endLogoH / 2 - 0.02;
+        const eps = 0.004;
+        function endLogo(rotY, x) {
+          const m = new THREE.Mesh(
+            new THREE.PlaneGeometry(endLogoW, endLogoH),
+            new THREE.MeshStandardMaterial({
+              map: endLogoDecalTex, transparent: true, alphaTest: 0.25,
+              roughness: 0.9, metalness: 0.0, depthWrite: false, side: THREE.FrontSide
+            })
+          );
+          m.rotation.y = rotY;
+          m.position.set(x, endLogoY, 0);
+          base.add(m);
+        }
+        endLogo( Math.PI / 2,  BW / 2 + eps);  // right (+x)
+        endLogo(-Math.PI / 2, -BW / 2 - eps);  // left (-x)
+      }
+
+      // NAVY corner posts — outer navy, inner kraft
       [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (s) {
-        const m = [wMat(), wMat(), nMat(), nMat(), wMat(), wMat()];   // default white; +y top & -y bottom navy
+        const m = [kMat(), kMat(), nMat(), nMat(), kMat(), kMat()];
         m[s[0] > 0 ? 0 : 1] = nMat();   // outer X face → navy
         m[s[1] > 0 ? 4 : 5] = nMat();   // outer Z face → navy
         const p = new THREE.Mesh(new THREE.BoxGeometry(TC, BH, TC), m);
@@ -318,16 +439,12 @@
         base.add(p);
       });
 
-      // closed bottom — SOLID floor at the FULL footprint (BW×BD) so it caps the whole
-      // underside: the walls' bottom corrugation edge (which showed as a gap ring around
-      // the base perimeter) is now covered by the solid navy floor. Dropped a hair below
-      // the walls so it wins from below. After rotation.x=+PI/2: local +z→down(outer),
-      // local -z→up(interior). Outer bottom + perimeter edges = navy; interior top = white.
+      // closed bottom — navy outside, kraft interior floor
       (function () {
-        const m = [nMat(), nMat(), nMat(), nMat(), nMat(), wMat()]; // edges+bottom navy; -z(idx5)=white interior floor
+        const m = [nMat(), nMat(), nMat(), nMat(), nMat(), kMat()];
         const b = boxMesh(BW, BD, TC, m);
         b.rotation.x = Math.PI / 2;
-        b.position.set(0, -BH / 2 + TC / 2 - 0.002, 0);   // 0.002 below → caps the wall bottoms, no gap
+        b.position.set(0, -BH / 2 + TC / 2 - 0.002, 0);
         base.add(b);
       })();
 
@@ -340,12 +457,10 @@
       boxGroup.add(lid);
 
       const clr   = 0.012;                       // clearance between lid skirt and base wall
-      const LID_H = 0.5;                          // skirt height (how far the lid comes down)
       const LW = BW + 2 * TC + 2 * clr;          // lid outer width
       const LD = BD + 2 * TC + 2 * clr;          // lid outer depth
 
-      // TOP panel — SOLID board (corrugation removed here) so the top-face perimeter
-      // is flush with NO gap/opening at the edges. White outer UP, colored logo on top.
+      // TOP panel — SOLID board; white outer UP + kraft underside
       (function () {
         const b = solidBoard(LW, LD, cardMat(lidTopTex), wMat);
         b.rotation.x = -Math.PI / 2;             // outer (+z) → +y (up)
@@ -353,13 +468,13 @@
         lid.add(b);
       })();
 
-      // SKIRT — 4 short white walls hanging down from the top panel
+      // SKIRT — 4 short white walls; short ends carry matching finger handles
       (function () {
         const yc = -LID_H / 2 + TC / 2;          // skirt centred just under the top panel
         const bF = corrugatedBoard(LW, LID_H, wMat(), wMat); bF.position.set(0, yc,  LD / 2 - TC / 2); lid.add(bF);                     // front (+z)
         const bB = corrugatedBoard(LW, LID_H, wMat(), wMat); bB.rotation.y = Math.PI;      bB.position.set(0, yc, -LD / 2 + TC / 2); lid.add(bB); // back (-z)
-        const bR = corrugatedBoard(LD - 2 * TC, LID_H, wMat(), wMat); bR.rotation.y =  Math.PI / 2; bR.position.set(LW / 2 - TC / 2, yc, 0); lid.add(bR); // right (+x)
-        const bL = corrugatedBoard(LD - 2 * TC, LID_H, wMat(), wMat); bL.rotation.y = -Math.PI / 2; bL.position.set(-LW / 2 + TC / 2, yc, 0); lid.add(bL); // left (-x)
+        const bR = corrugatedBoard(LD - 2 * TC, LID_H, wMat(), wMat, 0); bR.rotation.y =  Math.PI / 2; bR.position.set(LW / 2 - TC / 2, yc, 0); lid.add(bR); // right + handle
+        const bL = corrugatedBoard(LD - 2 * TC, LID_H, wMat(), wMat, 0); bL.rotation.y = -Math.PI / 2; bL.position.set(-LW / 2 + TC / 2, yc, 0); lid.add(bL); // left + handle
 
         // LOGO decals on the FOUR small side faces — thin billboards just outside each
         // skirt face; a plane rotated to face outward shows the logo un-mirrored on
@@ -375,8 +490,7 @@
         }
         sideLogo(0,            [0, 0,  LD / 2 + eps]);   // front (+z)
         sideLogo(Math.PI,      [0, 0, -LD / 2 - eps]);   // back (-z)
-        sideLogo(Math.PI / 2,  [ LW / 2 + eps, 0, 0]);   // right (+x)
-        sideLogo(-Math.PI / 2, [-LW / 2 - eps, 0, 0]);   // left (-x)
+        // left/right ends keep finger-handle holes clear (no logo decal)
 
         // WHITE corner posts — fill the TC×TC vertical corner column to hide the
         // seam between adjacent skirt panels. FLUSH: outer faces land exactly on the
@@ -410,7 +524,7 @@
       shadowCatcher.receiveShadow = true;
       scene.add(shadowCatcher);
 
-      /* ---------- lid state: 0 = CLOSED, 1 = OPEN (same as carry-handle carton) ----------
+      /* ---------- lid state: 0 = CLOSED, 1 = OPEN (flipped upside-down beside the base) ----------
          Phased so the lid never clips the base sides or the ground:
            1) rise straight up  →  2) slide beside  →  3) flip 180°  →  4) lower onto ground */
       const OPEN_X = (BW + LW) / 2 + 0.28;         // rest beside the base along +X
@@ -460,8 +574,8 @@
       function applyZoom(factor) {
         camera.position.multiplyScalar(factor);
         const dd = camera.position.length();
-        if (dd < 6) camera.position.setLength(6);
-        if (dd > 24) camera.position.setLength(24);
+        if (dd < 8) camera.position.setLength(8);
+        if (dd > 28) camera.position.setLength(28);
       }
 
       function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
@@ -530,7 +644,7 @@
       window.__debug = { THREE, boxGroup, base, lid, camera, scene,
         setLift: (t) => { liftTarget = t; lift = t; applyLift(t); } };
 
-      console.log("✓ Teleskopik shoe box ready");
+      console.log("✓ Corrugated carry-handle carton ready");
     }
   </script>
 </body>

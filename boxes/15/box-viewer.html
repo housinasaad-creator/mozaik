@@ -58,7 +58,7 @@
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setClearColor(0x000000, 0);
       var __mzkWeak = (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || matchMedia("(prefers-reduced-motion: reduce)").matches;
-      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, __mzkWeak ? 1 : 1.5));  // weak devices render at 1x (big GPU saving); strong devices stay crisp at 1.5x
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, __mzkWeak ? 1 : 1.25));  // weak=1x; strong capped at 1.25 (foil box is GPU-heavy)
       renderer.shadowMap.enabled = false;   // ground shadow removed (perf: no shadow-map pass)
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
@@ -73,30 +73,28 @@
       /* ---------- HDRI studio — SHARP strip lights (not soft blobs)
          so foil highlights visibly SLIDE across the logo as you drag/rotate ---------- */
       (function () {
-        const ec = document.createElement("canvas"); ec.width = 1024; ec.height = 512;
+        const EW = 512, EH = 256; // half-res HDRI — enough for foil slides, cheaper PMREM
+        const ec = document.createElement("canvas"); ec.width = EW; ec.height = EH;
         const ex = ec.getContext("2d");
-        // dark studio void — contrast makes moving reflections readable
-        ex.fillStyle = "#050608"; ex.fillRect(0, 0, 1024, 512);
-        // faint ceiling fill
-        const g = ex.createLinearGradient(0, 0, 0, 180);
+        ex.fillStyle = "#050608"; ex.fillRect(0, 0, EW, EH);
+        const g = ex.createLinearGradient(0, 0, 0, EH * 0.35);
         g.addColorStop(0, "#3a4254"); g.addColorStop(1, "rgba(5,6,8,0)");
-        ex.fillStyle = g; ex.fillRect(0, 0, 1024, 180);
+        ex.fillStyle = g; ex.fillRect(0, 0, EW, EH * 0.35);
         function strip(x, y, w, h, col) {
           ex.fillStyle = col;
           ex.fillRect(x, y, w, h);
-          // soft falloff edges so PMREM doesn't ring
           const rg = ex.createLinearGradient(x, y, x + w, y);
           rg.addColorStop(0, "rgba(0,0,0,0.55)"); rg.addColorStop(0.15, "rgba(0,0,0,0)");
           rg.addColorStop(0.85, "rgba(0,0,0,0)"); rg.addColorStop(1, "rgba(0,0,0,0.55)");
           ex.fillStyle = rg; ex.fillRect(x, y, w, h);
         }
-        // bright key / fill / rim strips — these are what you see racing on the foil
-        strip(160, 36, 220, 28, "#ffffff");
-        strip(620, 55, 160, 22, "#f4f7ff");
-        strip(380, 18, 260, 18, "#ffffff");
-        strip(80, 120, 90, 90, "#ffe6b0");   // warm bounce
-        strip(860, 110, 70, 70, "#dce6ff");  // cool bounce
-        strip(450, 200, 140, 16, "#fff6e0"); // horizon kiss
+        const sx = EW / 1024, sy = EH / 512;
+        strip(160 * sx, 36 * sy, 220 * sx, 28 * sy, "#ffffff");
+        strip(620 * sx, 55 * sy, 160 * sx, 22 * sy, "#f4f7ff");
+        strip(380 * sx, 18 * sy, 260 * sx, 18 * sy, "#ffffff");
+        strip(80 * sx, 120 * sy, 90 * sx, 90 * sy, "#ffe6b0");
+        strip(860 * sx, 110 * sy, 70 * sx, 70 * sy, "#dce6ff");
+        strip(450 * sx, 200 * sy, 140 * sx, 16 * sy, "#fff6e0");
         const et = new THREE.CanvasTexture(ec);
         et.mapping = THREE.EquirectangularReflectionMapping;
         const pmrem = new THREE.PMREMGenerator(renderer);
@@ -134,17 +132,14 @@
       key.shadow.radius = 7;
       scene.add(key);
 
-      const fill = new THREE.DirectionalLight(0xcfe0ff, 0.18);
+      const fill = new THREE.DirectionalLight(0xcfe0ff, 0.22);
       fill.position.set(-5, 3, -4);
       scene.add(fill);
 
-      // warm skim light — GGX specular on the foil slides when the box turns
-      const rim = new THREE.DirectionalLight(0xffe6b8, 0.85);
+      // one warm skim (rim+spark merged) — fewer lights, foil still slides via env
+      const rim = new THREE.DirectionalLight(0xffe6b8, 0.95);
       rim.position.set(-2.5, 6.5, -4);
       scene.add(rim);
-      const spark = new THREE.DirectionalLight(0xfff2d0, 0.65);
-      spark.position.set(5, 4, 2);
-      scene.add(spark);
 
       /* ---------- helpers ---------- */
       function toTexture(c) {
@@ -420,7 +415,7 @@
 
       const cardMat = (map) => new THREE.MeshStandardMaterial({
         map, metalness: 0.0, roughness: 0.85, bumpMap: bumpTex, bumpScale: 0.008,
-        envMapIntensity: 0.0, side: THREE.DoubleSide   // navy board fully matte — no reflection
+        envMapIntensity: 0.0, side: THREE.FrontSide   // opaque boards — skip back-face shading
       });
 
       /* foil panel: navy board + GOLD metallic-glossy Mozaik mark (from old Hot Foil).
@@ -551,7 +546,7 @@
         const m = new THREE.MeshStandardMaterial({
           map: maps.map, roughnessMap: maps.rough, metalnessMap: maps.metal,
           bumpMap: maps.bump || null, bumpScale: maps.bump ? 0.02 : 0,
-          metalness: 1.0, roughness: 1.0, envMapIntensity: 3.6, side: THREE.DoubleSide
+          metalness: 1.0, roughness: 1.0, envMapIntensity: 3.6, side: THREE.FrontSide
         });
         if (scene.environment) m.envMap = scene.environment;
         return m;
@@ -629,7 +624,7 @@
         shape.absarc(0, len, R, 0, Math.PI, true); // semicircle dipping INTO the tab
         shape.lineTo(-w / 2, len);
         shape.closePath();
-        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, curveSegments: 28 }));
+        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, curveSegments: 10 }));
         geo.rotateX(Math.PI / 2); // shape length → +z, extrude → -y thickness
         geo.translate(0, thick / 2, 0); // center the thickness
         return geo;
@@ -644,14 +639,14 @@
 
       const trayGroup = new THREE.Group();
 
-      const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
-      const navyTex = plainPanel(1024, 1024, NAVY, 0.5);
-      // gold on lid rim + logos; white ornaments on the side faces
-      const lidTopMaps = navyLidFrameMaps(1400, 900);   // upper lid — rounded gold frame only
-      const tabMaps = foilTabMaps(1400, 300); // lock tab + gold foil logo
-      const sideOrnTex = sideOrnamentTexture(1400, 440); // left/right ends — white frame + shapes
-      const lidInTex = plainPanel(1024, 1024, WHITE, 0.4);   // interior: plain white
-      const creaseInnerTex = creasedInnerTexture(1400, 300, BOX_W); // long-wall interior + corner glue creases
+      const whiteTex = plainPanel(512, 512, WHITE, 0.5);
+      const navyTex = plainPanel(512, 512, NAVY, 0.5);
+      // gold on lid rim + logos; ornaments — half-res maps (big FPS/VRAM win)
+      const lidTopMaps = navyLidFrameMaps(700, 450);   // upper lid — rounded gold frame only
+      const tabMaps = foilTabMaps(700, 150); // lock tab + gold foil logo
+      const sideOrnTex = sideOrnamentTexture(700, 220); // left/right ends — frame + shapes
+      const lidInTex = plainPanel(512, 512, WHITE, 0.4);   // interior: plain white
+      const creaseInnerTex = creasedInnerTexture(700, 150, BOX_W); // long-wall interior + glue creases
       const oMat = (maps) => foilMat(maps);
       const navyMat = () => cardMat(navyTex);
       const sideOrnMat = () => cardMat(sideOrnTex);
@@ -668,18 +663,19 @@
       trayGroup.add(floor);
 
       // face order [+x,-x,+y,-y,+z,-z] = [right,left,top,bottom,front,back]
-      const wI = () => cardMat(whiteTex); // interior white
-      // back wall — plain navy exterior
+      // board THICKNESS edges stay NAVY so corners never flash a white seam line
+      const wI = () => cardMat(whiteTex); // interior white (inner face only)
+      // back wall — plain navy exterior; only +z (inside) is white
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        wI(), wI(), wI(), wI(), cardMat(creaseInnerTex), navyMat()
+        navyMat(), navyMat(), navyMat(), navyMat(), cardMat(creaseInnerTex), navyMat()
       ]);
       backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + T / 2);
       backWall.castShadow = backWall.receiveShadow = true;
       trayGroup.add(backWall);
 
-      // front wall — plain navy + LIVE gold foil logo decal on +z
+      // front wall — plain navy + LIVE gold foil logo; only -z (inside) is white
       const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        wI(), wI(), wI(), wI(), navyMat(), cardMat(creaseInnerTex)
+        navyMat(), navyMat(), navyMat(), navyMat(), navyMat(), cardMat(creaseInnerTex)
       ]);
       frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - T / 2);
       frontWall.castShadow = frontWall.receiveShadow = true;
@@ -690,16 +686,16 @@
         frontWall.add(frontFoil);
       }
 
-      // left / right ends — navy + white ornaments (frame + shape row)
+      // left / right ends — ornaments outside; white ONLY on the inner face
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        wI(), sideOrnMat(), wI(), wI(), wI(), wI()
+        wI(), sideOrnMat(), navyMat(), navyMat(), navyMat(), navyMat()
       ]);
       leftWall.position.set(-BOX_W / 2 + T / 2, BOX_H / 2 + FLOOR_T, 0);
       leftWall.castShadow = leftWall.receiveShadow = true;
       trayGroup.add(leftWall);
 
       const rightWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        sideOrnMat(), wI(), wI(), wI(), wI(), wI()
+        sideOrnMat(), wI(), navyMat(), navyMat(), navyMat(), navyMat()
       ]);
       rightWall.position.set(BOX_W / 2 - T / 2, BOX_H / 2 + FLOOR_T, 0);
       rightWall.castShadow = rightWall.receiveShadow = true;
@@ -760,7 +756,7 @@
       tuckPivot.add(tuckLiner);
 
       // two side tabs — white ornaments on outer face (rotated to follow long z-axis)
-      const sideTabFace = sideOrnamentTexture(1400, 440);
+      const sideTabFace = sideOrnamentTexture(700, 220);
       sideTabFace.center.set(0.5, 0.5); sideTabFace.rotation = Math.PI / 2;
       const sideTucks = [];
       [-1, 1].forEach((sx) => {
@@ -886,6 +882,7 @@
       /* ---------- loop ---------- */
       addEventListener("message", function (e) { if (e.data === "mzk:pause") window.__mzkPaused = true; else if (e.data === "mzk:resume") window.__mzkPaused = false; });
       document.addEventListener("visibilitychange", function () { window.__mzkPaused = document.hidden; });
+      let foilFrame = 0, lastFoilRx = NaN, lastFoilRy = NaN;
       (function animate() {
         requestAnimationFrame(animate);
         if (window.__mzkPaused) return;
@@ -894,10 +891,15 @@
           fold += (foldTarget - fold) * 0.09;
           applyFold(fold);
         }
-        // live foil: sheen tracks rotation (also during auto-spin)
-        for (let i = 0; i < foilDecals.length; i++) {
-          const fn = foilDecals[i].userData.foilPaint;
-          if (fn) fn(rot.x, rot.y);
+        // live foil: only when rotation changed, and at most every 3rd frame (big GPU save)
+        foilFrame++;
+        const rotMoved = Math.abs(rot.x - lastFoilRx) > 0.0008 || Math.abs(rot.y - lastFoilRy) > 0.0008;
+        if (rotMoved && (foilFrame % 3 === 0 || dragging)) {
+          lastFoilRx = rot.x; lastFoilRy = rot.y;
+          for (let i = 0; i < foilDecals.length; i++) {
+            const fn = foilDecals[i].userData.foilPaint;
+            if (fn) fn(rot.x, rot.y);
+          }
         }
         renderer.render(scene, camera);
       })();
