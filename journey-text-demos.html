@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>معاينة — تلاشي وعجلة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --accent: #b58e3a;
+      --accent-soft: #c9a659;
+      --accent2: #a5843c;
+      --bg: #0c1836;
+      --text: #efeadd;
+      --text-dim: #aeb6c6;
+      --stroke: rgba(181, 142, 58, 0.22);
+      --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+      --font-head: "El Messiri", system-ui, sans-serif;
+      --font-body: "Tajawal", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .demo-bar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(12, 24, 54, 0.92);
+      border-bottom: 1px solid var(--stroke);
+      padding: 0.85rem 1.2rem 1rem;
+    }
+    .demo-bar__inner {
+      width: min(920px, 100%);
+      margin-inline: auto;
+      display: grid;
+      gap: 0.7rem;
+    }
+    .demo-bar__note {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .demo-bar__note strong { color: var(--accent-soft); }
+    .demo-tabs { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .demo-tabs button {
+      font-family: var(--font-head);
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      padding: 0.55rem 1.15rem;
+      cursor: pointer;
+      transition: color 0.25s, background 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.2s var(--ease);
+    }
+    .demo-tabs button:hover { color: var(--text); transform: translateY(-1px); }
+    .demo-tabs button.is-active {
+      color: #20180a;
+      border-color: transparent;
+      background: linear-gradient(120deg, var(--accent-soft), var(--accent));
+      box-shadow: 0 0 22px -4px rgba(181, 142, 58, 0.65);
+    }
+    .demo-meta {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--text-dim);
+      line-height: 1.55;
+      min-height: 2.6em;
+    }
+    .demo-meta b {
+      color: var(--accent-soft);
+      font-family: var(--font-head);
+      font-weight: 700;
+    }
+
+    .panel { display: none; }
+    .panel.is-active { display: block; }
+
+    .stage-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 70% 30%, rgba(181, 142, 58, 0.12), transparent 55%),
+        linear-gradient(160deg, #0c1836 0%, #12244a 55%, #0a142c 100%);
+    }
+    .stage-bg video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.38;
+      filter: brightness(0.95) saturate(0.95);
+    }
+    .stage-veil {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        rgba(10, 10, 12, 0.9) 0%,
+        rgba(10, 10, 12, 0.72) 48%,
+        rgba(10, 10, 12, 0.28) 72%,
+        rgba(10, 10, 12, 0) 88%
+      );
+    }
+    @media (max-width: 860px) {
+      .stage-veil {
+        background: linear-gradient(180deg, rgba(10, 10, 12, 0.72), rgba(10, 10, 12, 0.82));
+      }
+    }
+
+    .kicker {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--accent-soft);
+      margin-bottom: 0.55rem;
+    }
+    .flow-title {
+      font-family: var(--font-head);
+      font-size: clamp(1.85rem, 3.1vw, 2.7rem);
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 0 0 1.5rem;
+    }
+    .flow-title .grad {
+      background: linear-gradient(100deg, var(--accent-soft), var(--accent) 55%, var(--accent2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .jstory {
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: clamp(1.12rem, 1.45vw, 1.38rem);
+      line-height: 1.65;
+      color: var(--text);
+      margin: 0 0 1.35rem;
+    }
+    .jhead { color: var(--accent2); font-weight: 800; }
+    .jstory b:not(.jhead) { color: var(--accent-soft); font-weight: 800; }
+
+    /* ========== 1) FADE ========== */
+    .fade-flow {
+      position: relative;
+      z-index: 2;
+      width: min(62vw, 820px);
+      margin-inline-start: clamp(1.2rem, 3.5vw, 4.5rem);
+      padding: 2.2rem 0 40vh;
+    }
+    @media (max-width: 860px) {
+      .fade-flow { width: min(92vw, 620px); margin-inline: auto; }
+    }
+    .fade-line {
+      display: block;
+      opacity: 0.08;
+      filter: blur(1.5px);
+      transform: translateY(10px);
+      transition:
+        opacity 0.55s var(--ease),
+        filter 0.55s var(--ease),
+        transform 0.55s var(--ease);
+      will-change: opacity, filter, transform;
+    }
+    .fade-line.is-mid {
+      opacity: 1;
+      filter: none;
+      transform: none;
+    }
+    .fade-line.is-soft {
+      opacity: 0.35;
+      filter: blur(0.6px);
+      transform: none;
+    }
+    .fade-story { margin: 0 0 1.5rem; }
+
+    /* ========== 2) WHEEL ========== */
+    .wheel-stage {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      height: 100vh;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      perspective: 1400px;
+      pointer-events: none;
+    }
+    .wheel-stage .wheel-card { pointer-events: auto; }
+    .panel[data-panel="wheel"]:not(.is-active) .wheel-stage { display: none; }
+    .wheel-head {
+      position: absolute;
+      top: 1.4rem;
+      inset-inline: clamp(1rem, 4vw, 3rem);
+      z-index: 3;
+      pointer-events: none;
+    }
+    .wheel-head .flow-title { margin-bottom: 0; font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
+    .wheel-scene {
+      position: relative;
+      width: min(70vw, 760px);
+      height: min(70vh, 560px);
+      transform-style: preserve-3d;
+      margin-inline-start: clamp(0rem, 2vw, 2rem);
+    }
+    @media (max-width: 860px) {
+      .wheel-scene { width: min(92vw, 620px); margin-inline: auto; }
+    }
+    .wheel-card {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0 0.4rem;
+      border: none;
+      background: none;
+      box-shadow: none;
+      border-radius: 0;
+      backface-visibility: hidden;
+      transform-style: preserve-3d;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: clamp(1.12rem, 1.5vw, 1.42rem);
+      line-height: 1.55;
+      color: var(--text);
+      direction: rtl;
+      text-align: right;
+    }
+    .wheel-card b { color: var(--accent-soft); font-weight: 800; }
+    .wheel-card .jhead { color: var(--accent2); font-weight: 800; }
+    .wheel-measure {
+      position: absolute;
+      visibility: hidden;
+      pointer-events: none;
+      width: min(70vw, 760px);
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: clamp(1.12rem, 1.5vw, 1.42rem);
+      line-height: 1.55;
+      direction: rtl;
+      text-align: right;
+      white-space: normal;
+    }
+    @media (max-width: 860px) {
+      .wheel-measure { width: min(92vw, 620px); }
+    }
+    .wheel-hint {
+      position: absolute;
+      bottom: 1.4rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      color: var(--accent-soft);
+      font-size: 0.9rem;
+      opacity: 0.75;
+      letter-spacing: 0.04em;
+    }
+    .wheel-spacer {
+      position: relative;
+      z-index: 1;
+      height: calc(100vh + var(--wheel-steps, 40) * 18vh);
+      pointer-events: none;
+    }
+    .wheel-progress {
+      position: fixed;
+      bottom: 1.35rem;
+      inset-inline-end: 1.2rem;
+      z-index: 5;
+      font-family: var(--font-head);
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      background: rgba(12, 24, 54, 0.7);
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+    }
+    .panel[data-panel="wheel"]:not(.is-active) .wheel-progress { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-line {
+        opacity: 1 !important;
+        filter: none !important;
+        transform: none !important;
+        transition: none !important;
+      }
+      .wheel-card {
+        position: relative !important;
+        transform: none !important;
+        opacity: 1 !important;
+        margin-bottom: 1rem;
+      }
+      .wheel-stage {
+        height: auto;
+        overflow: visible;
+        display: block;
+        padding: 2rem 1rem 4rem;
+      }
+      .wheel-scene {
+        height: auto;
+        transform: none !important;
+      }
+      .wheel-spacer, .wheel-hint, .wheel-progress { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="demo-bar">
+    <div class="demo-bar__inner">
+      <p class="demo-bar__note">
+        <strong>صفحة تجريبية</strong> — التلاشي + عجلة الأسطر. قلّي أي رقم تفضّل (1 أو 2).
+      </p>
+      <div class="demo-tabs" role="tablist" aria-label="نماذج العرض">
+        <button type="button" role="tab" data-demo="fade" class="is-active" aria-selected="true">1 — تلاشي</button>
+        <button type="button" role="tab" data-demo="wheel" aria-selected="false">2 — عجلة الأسطر</button>
+      </div>
+      <p class="demo-meta" id="demoMeta">
+        <b>تلاشي:</b> الأسطر تظهر وتخفت بنعومة مع السكرول — تركيز في الوسط، تلاشي فوق وتحت.
+      </p>
+    </div>
+  </header>
+
+  <div class="stage-bg" aria-hidden="true">
+    <video id="demoVideo" autoplay muted loop playsinline preload="metadata" poster="assets/hero-poster.jpg">
+      <source src="assets/hero.mp4" type="video/mp4" />
+    </video>
+    <div class="stage-veil"></div>
+  </div>
+
+  <!-- 1 FADE -->
+  <section class="panel is-active" data-panel="fade" aria-label="تلاشي">
+    <div class="fade-flow">
+      <span class="kicker">النموذج 1</span>
+      <h1 class="flow-title"><span class="grad">تلاشي</span> — رحلة النجاح</h1>
+      <div class="jtext" id="fadeRoot"></div>
+    </div>
+  </section>
+
+  <!-- 2 WHEEL -->
+  <section class="panel" data-panel="wheel" aria-label="عجلة الدوران" hidden>
+    <div class="wheel-spacer" id="wheelSpacer" aria-hidden="true"></div>
+    <div class="wheel-stage" id="wheelStage">
+      <div class="wheel-head">
+        <span class="kicker">النموذج 2</span>
+        <h1 class="flow-title"><span class="grad">عجلة الأسطر</span> — رحلة النجاح</h1>
+      </div>
+      <div class="wheel-scene" id="wheelScene"></div>
+      <div class="wheel-hint">سكرول ↑↓ لتدوير الأسطر</div>
+    </div>
+    <div class="wheel-progress" id="wheelProgress">1 / 1</div>
+    <div class="wheel-measure" id="wheelMeasure" aria-hidden="true"></div>
+  </section>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const STORY_HTML =
+        '<p class="jstory"><b class="jhead">مرحبا بكم في مطبعة موزاييك.</b> على <b>طريق الحرير</b> في سوريا ومن مدينة <b>حلب العريقة</b>، ولد <b>الحاج زكريا بيرقدار</b> سنة <b>1965</b>، الذي كافح منذ صغره في العديد من الأعمال الصناعية، واكتسب خبرة تجارية أتاحت له اسما كبيرا.</p>' +
+        '<p class="jstory"><b class="jhead">من نحن —</b> انتقل بنشاطاته إلى <b>تركيا عام 2012</b>، ووضع حجر الأساس لشركته التي ستصبح من <b>أكبر مطابع الأوفست في الإقليم</b>. نحن <b>شركة موزاييك للطباعة والتغليف (أوفست)</b>، التي تأسست في مدينة <b>أنطاكيا (هاطاي)</b> سنة <b>2018</b>. كانت شركتنا وما زالت متخصصة في صناعة المطبوعات ذات الطابع <b>الكرتوني المضلع</b>، وطباعة <b>الملصقات الورقية</b> بأنواعها. أسست على مساحة <b>1500 م²</b> بعمالة <b>20 شخصا</b> وطاقة إنتاجية تصل إلى <b>1800 طن سنويا</b>.</p>' +
+        '<p class="jstory"><b class="jhead">تاريخنا —</b> كان السيد <b>زكريا بيرقدار</b> رائدا للعديد من المشاريع؛ من <b>استثمار الأراضي</b> واستصلاحها، إلى <b>زراعة الزيتون</b> وقطفه وتخزينه، كما أقام منشأة <b>لعصر الزيتون</b> واستخراج الزيت وتخزينه وتوزيعه والتجارة به. وبسبب <b>الأزمة السورية</b> وما حصل هناك، قرر السفر إلى تركيا والعمل في مجالات صناعية خدمية. وبالتشاور مع أبنائه الذين يشاركونه القرار، تم التوافق على استحداث منشأة طباعية متخصصة في طباعة <b>الكرتون المضلع</b> وطباعة <b>الملصقات التجارية</b>، ليكون بذلك <b>أول من أسس منشأة طباعية</b> تقدم هذه الخدمات <b>كمستثمر أجنبي</b> على مستوى تركيا. وبعد <b>خمس سنوات من النجاح المستمر</b>، كان لا بد من توسيع المشروع ليكتسب مكانا استراتيجيا ومساحة تخدم الطلب وتواكب التطور؛ فاتجهت الأنظار إلى كبرى المناطق الصناعية في تركيا في مدينة <b>غازي عنتاب الصناعية</b>، وبدأت المشاورات بين أصحاب القرار والبحث عن المقر إلى أن استقرت الشركة في مكانها الحالي. وبعد <b>ثلاث سنوات من النجاحات المستمرة</b>، قرر مجلس الإدارة استحداث منشأة جديدة في الشمال السوري في مدينة <b>حلب الصناعية</b> بمساحة <b>7000 م²</b>، لتصبح المساحة الإجمالية للمنشأة <b>17000 م²</b>، تضم عمالة تقدر بـ<b>200 عامل</b> وطاقة إنتاجية <b>18000 طن سنويا</b>.</p>' +
+        '<p class="jstory"><b class="jhead">الرؤية —</b> انطلاقا من مبدئنا <b>«التغليف الصحيح هو أساس المنتج الصحيح»</b>؛ وبعد معاينة المنتجات التي سنقوم بإنتاج مغلفات تناسبها، ودراسة بيئة <b>الشحن والتخزين والعرض</b> من قبل <b>فريق أكاديمي خبير</b>، نقدم المشورة والنصيحة للعميل، وعليه نبدأ بالتجارب لصناعة <b>أفضل تصميم</b> يحفظ المنتج من العوامل الجوية وصعوبات الشحن والتحميل، بهدف <b>زيادة المبيعات</b> و<b>تقليل الهدر والتلف</b>.</p>' +
+        '<p class="jstory"><b class="jhead">رسالتنا —</b> نتيجة لخبراتنا التي تكونت من التعامل مع العملاء، من تجار وصناعيين موزعين على <b>46 دولة</b>، استطعنا بناء العديد من <b>الشراكات طويلة الأمد</b> مع عملائنا ذوي البصمة الكبيرة في الأسواق المحلية والعالمية. إن أول ما تقرؤه عين المستهلك هو <b>شكل المنتج وتصميمه وطريقة تغليفه</b>، وهي عوامل تجذب المستهلك وتساعده على اتخاذ <b>قرار الشراء</b>. ومن هنا نستطيع أن نجزم أن تأثير التغليف يأتي <b>بالمرتبة الأولى</b> قبل السعر والجودة. لذلك تقدم <b>مطبعة موزاييك</b> أفضل الحلول لجعل المنتج رائجا جذابا محببا ومميزا عما يحيط به من منتجات أخرى. ورسالتنا: <b>الغلاف هو أقصر طريق لإيصال منتجاتكم إلى العالمية</b>.</p>' +
+        '<p class="jstory"><b class="jhead">الاستراتيجية —</b> قامت الاستراتيجية على بناء المنشأة بعد العديد من الدراسات لتستطيع تقديم الخدمات للإقليم، بما يتيح لنا تقديم خدماتنا لكامل <b>الإقليم السوري – التركي</b> ولأصحاب الفعاليات في <b>أوروبا وباقي دول العالم</b>. فكان من الضروري اختيار مواقع استراتيجية غير بعيدة عن مدينة <b>مرسين</b>، المدينة التي يقع فيها <b>أهم ميناء في حوض المتوسط</b>، وموانئ <b>طرطوس واللاذقية</b>، لإتاحة الاستفادة من خدماته لعملائنا حول العالم. من خلال <b>فريق التسويق</b> في الشركة الذي يعرض الخدمات بحرفية عالية وأدوات متطورة وقنوات متعددة على الإنترنت، ينفذ الفريق خطة تسويقية تركز على <b>قيم الشركة ومميزاتها التنافسية</b>، وتضع بين يدي العميل <b>أفضل خيارات التغليف المبتكرة</b>. تعد <b>مطبعة موزاييك</b> الأحدث من نوعها بمواقعها الاستراتيجية وأحدث الآلات التي شكلت <b>40 خط إنتاج</b> يشرف عليها فريق من <b>أفضل الخبرات</b> في مجال الطباعة. يقوم المعمل على قدرات <b>200 عامل</b> من إداريين وفنيين وعمال، وتستقطب الشركة عمالة جديدة تقدر بـ<b>10% سنويا</b>.</p>' +
+        '<p class="jstory"><b class="jhead">قيمنا —</b> <b>المنتج الصحيح</b> • <b>الجودة العالية</b> • <b>السعر المنافس</b> • <b>فريق عمل خبير</b> • <b>بيئة عمل احترافية</b> • <b>الالتزام بالمواعيد</b> • <b>تقديم أفضل خدمة للزبون</b>.</p>' +
+        '<p class="jstory"><b class="jhead">خدماتنا —</b> تنفرد المطبعة بإنتاج كرتون مضلع <b>«تريبلكس»</b> مكون من <b>7 طبقات</b> من الكرتون المموج، <b>عالي العزل</b> للحرارة والرطوبة و<b>شديد التحمل</b> للأوزان العالية. خصصت الشركة <b>فريقا كاملا من المصممين المحترفين</b> لتلبية نماذج التصاميم المستعجلة وعدم هدر وقت العميل، كما توفر <b>نماذج أولية مجسمة</b> من الأغلفة تتيح للعميل عيش تجربة حقيقية مع المنتج وإبداء الملاحظات اللازمة. وتوفر الشركة خدمة <b>طباعة الأعداد الصغيرة</b> تلبية لحاجة العملاء، إضافة إلى خدمات <b>الشحن والتخليص الجمركي</b>.</p>' +
+        '<p class="jstory"><b class="jhead">الأهداف —</b> تسعى الشركة إلى تحويل العمل إلى <b>نظام المكننة</b> الذي يحتاج إلى الحد الأدنى من العنصر البشري، لتلافي الأخطاء والهدر والمساهمة في <b>الحفاظ على البيئة</b>. وقد حققت الشركة منذ انطلاقتها الثانية زيادة في عدد العملاء إلى <b>650 عميلا</b> حول العالم، واستطاعت رفع الطاقة الإنتاجية من <b>25 طنا</b> إلى <b>1500 طن شهريا</b>، وتسعى الآن إلى <b>5000 طن شهريا</b>. كما وصلت إلى <b>25 خط إنتاج آليا متكاملا</b> وتسعى للوصول إلى <b>50 خطا</b>، مع إتاحة المجال لتقديم خدمات متعددة في مجال <b>طباعة الورقيات</b>. وتتجه الشركة إلى التعامل مع <b>الماركات الإقليمية والعالمية</b> بعد نجاحها في تلبية احتياجات شرائح متعددة؛ إذ تقدم خدماتها لمصنعي <b>المواد الغذائية</b> و<b>المواد الطبية</b> و<b>الأدوات الصناعية</b> و<b>الملابس والأحذية</b>.</p>';
+
+      const META = {
+        fade: "<b>تلاشي:</b> الأسطر تظهر وتخفت بنعومة مع السكرول — تركيز في الوسط، تلاشي فوق وتحت.",
+        wheel: "<b>عجلة الأسطر:</b> كل سطر يدور فوق/تحت كعجلة — مش فقرات كاملة.",
+      };
+
+      const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const $$ = (s, c = document) => [...c.querySelectorAll(s)];
+      let active = "fade";
+      let raf = 0;
+      let wheelCards = [];
+      let wheelRadius = 280;
+      const WHEEL_ANGLE = 12; // degrees between neighboring lines (tighter stack)
+      const WHEEL_VISIBLE = 7; // half-window of lines above/below center
+
+      const v = document.getElementById("demoVideo");
+      if (v) {
+        v.muted = true;
+        v.defaultMuted = true;
+        const tryPlay = () => { const p = v.play(); if (p) p.catch(() => {}); };
+        tryPlay();
+        v.addEventListener("canplay", tryPlay, { once: true });
+        document.addEventListener("pointerdown", tryPlay, { once: true });
+      }
+
+      function storyList() {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = STORY_HTML;
+        return [...wrap.querySelectorAll(".jstory")].map((p) => p.outerHTML);
+      }
+      const stories = storyList();
+
+      /* ========== FADE: split into visual lines ========== */
+      function buildFade() {
+        const root = document.getElementById("fadeRoot");
+        root.innerHTML = "";
+        stories.forEach((html) => {
+          const holder = document.createElement("div");
+          holder.className = "fade-story";
+          holder.innerHTML = html;
+          const p = holder.firstElementChild;
+          const orig = p.innerHTML;
+
+          // wrap words
+          const words = [];
+          (function walk(node, em, head) {
+            node.childNodes.forEach((n) => {
+              if (n.nodeType === 3) {
+                n.textContent.split(/\s+/).filter(Boolean).forEach((wd) => {
+                  words.push({ wd, em, head });
+                });
+              } else if (n.nodeType === 1) {
+                walk(
+                  n,
+                  em || n.tagName === "B" || n.tagName === "STRONG",
+                  head || n.classList.contains("jhead")
+                );
+              }
+            });
+          })(p, false, false);
+
+          p.innerHTML = words
+            .map((w) => {
+              const cls =
+                "fword" +
+                (w.head ? " jhead" : "") +
+                (w.em && !w.head ? " jem" : "");
+              const style = w.em && !w.head ? ' style="color:var(--accent-soft);font-weight:800"' : "";
+              const headStyle = w.head ? ' style="color:var(--accent2);font-weight:800"' : "";
+              return '<span class="' + cls + '"' + (w.head ? headStyle : style) + ">" + w.wd + "</span>";
+            })
+            .join(" ");
+
+          const spans = $$(".fword", p);
+          const lines = [];
+          let cur = [];
+          let curTop = null;
+          spans.forEach((s) => {
+            const t = s.offsetTop;
+            if (curTop === null || Math.abs(t - curTop) < 4) {
+              cur.push(s);
+              if (curTop === null) curTop = t;
+            } else {
+              lines.push(cur);
+              cur = [s];
+              curTop = t;
+            }
+          });
+          if (cur.length) lines.push(cur);
+
+          p.innerHTML = lines
+            .map((ls) => '<span class="fade-line">' + ls.map((s) => s.outerHTML).join(" ") + "</span>")
+            .join("");
+
+          // fallback if measuring failed (hidden panel)
+          if (!lines.length) p.innerHTML = orig;
+          root.appendChild(holder);
+        });
+      }
+
+      function updateFade() {
+        if (active !== "fade") return;
+        if (reduced) {
+          $$(".fade-line").forEach((l) => {
+            l.classList.add("is-mid");
+            l.classList.remove("is-soft");
+          });
+          return;
+        }
+        const focus = innerHeight * 0.42;
+        const softBand = innerHeight * 0.22;
+        const midBand = innerHeight * 0.1;
+        $$(".fade-line").forEach((line) => {
+          const r = line.getBoundingClientRect();
+          const mid = r.top + r.height / 2;
+          const d = Math.abs(mid - focus);
+          line.classList.toggle("is-mid", d < midBand);
+          line.classList.toggle("is-soft", d >= midBand && d < softBand);
+          if (d >= softBand) {
+            line.classList.remove("is-mid", "is-soft");
+          }
+        });
+      }
+
+      /* ========== WHEEL (per visual LINE) ========== */
+      function extractLinesFromHtml(html, measureEl) {
+        measureEl.innerHTML = html;
+        const p = measureEl.firstElementChild || measureEl;
+        const words = [];
+        (function walk(node, em, head) {
+          node.childNodes.forEach((n) => {
+            if (n.nodeType === 3) {
+              n.textContent.split(/\s+/).filter(Boolean).forEach((wd) => {
+                words.push({ wd, em, head });
+              });
+            } else if (n.nodeType === 1) {
+              walk(
+                n,
+                em || n.tagName === "B" || n.tagName === "STRONG",
+                head || n.classList.contains("jhead")
+              );
+            }
+          });
+        })(p, false, false);
+
+        measureEl.innerHTML = words
+          .map((w) => {
+            if (w.head) return '<span class="wword jhead">' + w.wd + "</span>";
+            if (w.em) return "<b class='wword'>" + w.wd + "</b>";
+            return '<span class="wword">' + w.wd + "</span>";
+          })
+          .join(" ");
+
+        const spans = $$(".wword", measureEl);
+        const groups = [];
+        let cur = [];
+        let curTop = null;
+        spans.forEach((s) => {
+          const t = s.offsetTop;
+          if (curTop === null || Math.abs(t - curTop) < 4) {
+            cur.push(s);
+            if (curTop === null) curTop = t;
+          } else {
+            groups.push(cur);
+            cur = [s];
+            curTop = t;
+          }
+        });
+        if (cur.length) groups.push(cur);
+
+        return groups.map((g) => g.map((s) => s.outerHTML).join(" "));
+      }
+
+      function collectAllLines() {
+        const measure = document.getElementById("wheelMeasure");
+        // force on-screen layout for accurate line breaks (even if wheel panel is inactive)
+        const prev = {
+          position: measure.style.position,
+          visibility: measure.style.visibility,
+          left: measure.style.left,
+          top: measure.style.top,
+          zIndex: measure.style.zIndex,
+        };
+        measure.style.position = "fixed";
+        measure.style.visibility = "hidden";
+        measure.style.left = "0";
+        measure.style.top = "0";
+        measure.style.zIndex = "-1";
+        measure.style.width = Math.min(innerWidth * (innerWidth <= 860 ? 0.92 : 0.7), 760) + "px";
+
+        const lines = [];
+        stories.forEach((html) => {
+          extractLinesFromHtml(html, measure).forEach((lineHtml) => lines.push(lineHtml));
+        });
+        measure.innerHTML = "";
+        measure.style.position = prev.position;
+        measure.style.visibility = prev.visibility;
+        measure.style.left = prev.left;
+        measure.style.top = prev.top;
+        measure.style.zIndex = prev.zIndex;
+        return lines;
+      }
+
+      function buildWheel() {
+        const scene = document.getElementById("wheelScene");
+        const spacer = document.getElementById("wheelSpacer");
+        scene.innerHTML = "";
+
+        const lines = collectAllLines();
+
+        wheelCards = lines.map((lineHtml, i) => {
+          const card = document.createElement("div");
+          card.className = "wheel-card";
+          card.innerHTML = lineHtml;
+          card.dataset.index = String(i);
+          scene.appendChild(card);
+          return card;
+        });
+        spacer.style.setProperty("--wheel-steps", String(Math.max(lines.length - 1, 1)));
+        measureWheel();
+        updateWheel();
+      }
+
+      function measureWheel() {
+        const scene = document.getElementById("wheelScene");
+        // smaller radius + smaller angle = lines sit closer together
+        wheelRadius = Math.max(160, Math.min(scene.clientHeight * 0.42, 260));
+      }
+
+      function updateWheel() {
+        if (active !== "wheel") return;
+        const n = wheelCards.length;
+        if (!n) return;
+
+        if (reduced) {
+          wheelCards.forEach((c, i) => {
+            c.style.transform = "none";
+            c.style.opacity = i < 12 ? "1" : "0";
+            c.style.position = i < 12 ? "relative" : "absolute";
+            c.style.top = "auto";
+            c.style.left = "auto";
+          });
+          return;
+        }
+
+        const spacer = document.getElementById("wheelSpacer");
+        const maxScroll = Math.max(1, spacer.offsetHeight - innerHeight);
+        const progress = Math.max(0, Math.min(1, scrollY / maxScroll));
+        const cursor = progress * (n - 1);
+        const center = Math.round(cursor);
+
+        wheelCards.forEach((card, i) => {
+          const delta = i - cursor;
+          const abs = Math.abs(delta);
+          if (abs > WHEEL_VISIBLE + 0.6) {
+            card.style.opacity = "0";
+            card.style.pointerEvents = "none";
+            card.style.transform = "translate(-50%, -50%) scale(0.5)";
+            card.style.filter = "none";
+            return;
+          }
+
+          const angle = delta * WHEEL_ANGLE;
+          const rad = (angle * Math.PI) / 180;
+          const z = Math.cos(rad) * wheelRadius;
+          const opacity = Math.max(0, 1 - abs / (WHEEL_VISIBLE + 0.35));
+          const scale = 0.82 + opacity * 0.18;
+
+          card.style.transform =
+            "translate(-50%, -50%) rotateX(" +
+            (-angle).toFixed(2) +
+            "deg) translateZ(" +
+            wheelRadius +
+            "px) scale(" +
+            scale.toFixed(3) +
+            ")";
+          card.style.opacity = opacity.toFixed(3);
+          card.style.zIndex = String(Math.round(1000 + z));
+          card.style.pointerEvents = "none";
+          card.style.filter =
+            abs > 1.2 ? "blur(" + Math.min(2.4, (abs - 1.2) * 0.7).toFixed(2) + "px)" : "none";
+        });
+
+        document.getElementById("wheelProgress").textContent = center + 1 + " / " + n;
+      }
+
+      function tick() {
+        raf = 0;
+        if (active === "fade") updateFade();
+        else if (active === "wheel") updateWheel();
+      }
+      function requestTick() {
+        if (!raf) raf = requestAnimationFrame(tick);
+      }
+
+      function showPanel(name) {
+        active = name;
+        $$(".demo-tabs button").forEach((btn) => {
+          const on = btn.dataset.demo === name;
+          btn.classList.toggle("is-active", on);
+          btn.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        $$(".panel").forEach((panel) => {
+          const on = panel.dataset.panel === name;
+          panel.classList.toggle("is-active", on);
+          panel.hidden = !on;
+        });
+        document.getElementById("demoMeta").innerHTML = META[name];
+        scrollTo(0, 0);
+
+        if (name === "fade") {
+          // rebuild after visible so line metrics work
+          requestAnimationFrame(() => {
+            buildFade();
+            updateFade();
+          });
+        }
+        if (name === "wheel") {
+          requestAnimationFrame(() => {
+            buildWheel();
+            updateWheel();
+          });
+        }
+        requestTick();
+      }
+
+      $$(".demo-tabs button").forEach((btn) => {
+        btn.addEventListener("click", () => showPanel(btn.dataset.demo));
+      });
+
+      addEventListener("scroll", requestTick, { passive: true });
+      addEventListener("resize", () => {
+        if (active === "fade") buildFade();
+        if (active === "wheel") buildWheel();
+        else measureWheel();
+        requestTick();
+      });
+
+      // Initial: fade panel is visible; wheel builds when opened (needs layout)
+      buildFade();
+      requestTick();
+    })();
+  </script>
+</body>
+</html>
