@@ -39,6 +39,10 @@
     try { localStorage.setItem("mozaik_lang", lang); } catch (e) {}
     setYear();
     if (window.ScrollTrigger) ScrollTrigger.refresh();
+    // Nudge a repaint after i18n HTML swap — prevents stale dark gradient-text in some GPUs
+    requestAnimationFrame(() => {
+      $$(".grad").forEach((el) => { el.style.transform = "translateZ(0)"; });
+    });
     document.dispatchEvent(new CustomEvent("mozaik:lang", { detail: { lang } }));
   }
   $$("#lang [data-lang]").forEach((b) => b.addEventListener("click", () => applyLang(b.dataset.lang)));
