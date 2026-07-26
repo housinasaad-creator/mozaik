@@ -39,6 +39,7 @@
     try { localStorage.setItem("mozaik_lang", lang); } catch (e) {}
     setYear();
     if (window.ScrollTrigger) ScrollTrigger.refresh();
+    document.dispatchEvent(new CustomEvent("mozaik:lang", { detail: { lang } }));
   }
   $$("#lang [data-lang]").forEach((b) => b.addEventListener("click", () => applyLang(b.dataset.lang)));
   let savedLang = "en"; try { savedLang = localStorage.getItem("mozaik_lang") || "en"; } catch (e) {}
