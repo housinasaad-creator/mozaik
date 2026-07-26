@@ -240,154 +240,95 @@
         return toTexture(c);
       }
 
-      /* the decorative navy shape strip along the front wall (triangle, star,
-         circle, striped square, chevrons) — drawn to match the reference */
-      function patternWallTexture(wPx, hPx, base) {
+      /* matte gold geometric ornaments on navy side panels — order matches reference:
+         diamond · chevrons↓ · square · circles · star · triangle↓
+         (flat printed gold — no foil / metal / gloss) */
+      const ORN_GOLD = "#b8954a";
+      function drawWhiteShapeRow(x, wPx, hPx, cy, r) {
+        x.strokeStyle = ORN_GOLD; x.fillStyle = ORN_GOLD;
+        x.lineWidth = Math.max(2.5, wPx * 0.0045);
+        x.lineJoin = "round"; x.lineCap = "round";
+        const kinds = [0, 1, 2, 3, 4, 5]; // fixed order L→R
+        const gap = wPx / (kinds.length + 1);
+        for (let i = 0; i < kinds.length; i++) {
+          const cx = gap * (i + 1), kind = kinds[i];
+          x.save(); x.translate(cx, cy);
+          if (kind === 0) { // diamond
+            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, 0); x.lineTo(0, r); x.lineTo(-r, 0); x.closePath(); x.stroke();
+          } else if (kind === 1) { // triple chevrons pointing down
+            for (let k = -1; k <= 1; k++) {
+              const oy = k * r * 0.42;
+              x.beginPath();
+              x.moveTo(-r, oy - r * 0.35); x.lineTo(0, oy + r * 0.4); x.lineTo(r, oy - r * 0.35);
+              x.stroke();
+            }
+          } else if (kind === 2) { // plain square
+            x.strokeRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+          } else if (kind === 3) { // concentric circles
+            x.beginPath(); x.arc(0, 0, r, 0, 7); x.stroke();
+            x.beginPath(); x.arc(0, 0, r * 0.52, 0, 7); x.stroke();
+          } else if (kind === 4) { // five-point star
+            x.beginPath();
+            for (let k = 0; k < 10; k++) {
+              const rad = k % 2 ? r * 0.42 : r;
+              const a = -Math.PI / 2 + k * Math.PI / 5;
+              x.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+            }
+            x.closePath(); x.stroke();
+          } else { // triangle pointing down
+            x.beginPath(); x.moveTo(-r, -r * 0.75); x.lineTo(r, -r * 0.75); x.lineTo(0, r); x.closePath(); x.stroke();
+          }
+          x.restore();
+        }
+      }
+      function strokeWhiteDoubleFrame(x, w, h) {
+        const m1 = Math.round(Math.min(w, h) * 0.07);
+        const m2 = Math.round(Math.min(w, h) * 0.12);
+        x.strokeStyle = ORN_GOLD;
+        x.lineWidth = Math.max(2, Math.round(Math.min(w, h) * 0.012));
+        x.strokeRect(m1, m1, w - m1 * 2, h - m1 * 2);
+        x.lineWidth = Math.max(1.5, Math.round(Math.min(w, h) * 0.009));
+        x.strokeRect(m2, m2, w - m2 * 2, h - m2 * 2);
+      }
+      /* navy end / side face: white double frame + white shape row */
+      function sideOrnamentTexture(wPx, hPx) {
         const c = document.createElement("canvas");
         c.width = wPx; c.height = hPx;
         const x = c.getContext("2d");
-        x.fillStyle = base;
+        x.fillStyle = NAVY;
         x.fillRect(0, 0, wPx, hPx);
-        x.strokeStyle = ACCENT; x.fillStyle = ACCENT;
-        x.lineWidth = Math.max(2, wPx * 0.004);
-        const r = hPx * 0.16; // shape radius
-        const cy = hPx * 0.72; // strip near the bottom
-        const n = 6, gap = wPx / (n + 1);
-        for (let i = 1; i <= n; i++) {
-          const cx = gap * i;
-          x.save(); x.translate(cx, cy);
-          const kind = i % 6;
-          if (kind === 1) { // striped triangle
-            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, r); x.lineTo(-r, r); x.closePath(); x.stroke();
-            for (let s = -r + 6; s < r; s += 7) { x.beginPath(); x.moveTo(-r + (s + r) * 0.5, s); x.lineTo(r - (s + r) * 0.5, s); x.stroke(); }
-          } else if (kind === 2) { // star
-            x.beginPath();
-            for (let k = 0; k < 10; k++) { const rad = k % 2? r * 0.45 : r; const a = -Math.PI / 2 + k * Math.PI / 5; x.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); }
-            x.closePath(); x.stroke();
-          } else if (kind === 3) { // concentric circles
-            x.beginPath(); x.arc(0, 0, r, 0, 7); x.stroke();
-            x.beginPath(); x.arc(0, 0, r * 0.55, 0, 7); x.stroke();
-            x.beginPath(); x.arc(0, 0, r * 0.16, 0, 7); x.fill();
-          } else if (kind === 4) { // striped square
-            x.strokeRect(-r, -r, r * 2, r * 2);
-            for (let s = -r + 6; s < r; s += 7) { x.beginPath(); x.moveTo(-r, s); x.lineTo(r, s); x.stroke(); }
-          } else if (kind === 5) { // chevrons
-            for (let k = -1; k <= 1; k++) { x.beginPath(); x.moveTo(-r, k * r * 0.5 + r * 0.4); x.lineTo(0, k * r * 0.5 - r * 0.4); x.lineTo(r, k * r * 0.5 + r * 0.4); x.stroke(); }
-          } else { // diamond outline
-            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, 0); x.lineTo(0, r); x.lineTo(-r, 0); x.closePath(); x.stroke();
-          }
-          x.restore();
-        }
-        paperGrain(x, wPx, hPx, 0.5);
+        strokeWhiteDoubleFrame(x, wPx, hPx);
+        drawWhiteShapeRow(x, wPx, hPx, hPx * 0.5, hPx * 0.14);
+        paperGrain(x, wPx, hPx, 0.45);
         return toTexture(c);
       }
 
-      /* draw the row of light geometric shapes on navy end walls */
-      function drawShapeRow(x, wPx, hPx, cy, r, count) {
-        x.strokeStyle = ACCENT; x.fillStyle = ACCENT;
-        x.lineWidth = Math.max(2, wPx * 0.004);
-        const gap = wPx / (count + 1);
-        for (let i = 1; i <= count; i++) {
-          const cx = gap * i, kind = i % 6;
-          x.save(); x.translate(cx, cy);
-          if (kind === 1) {
-            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, r); x.lineTo(-r, r); x.closePath(); x.stroke();
-            for (let s = -r + 6; s < r; s += 7) { x.beginPath(); x.moveTo(-r + (s + r) * 0.5, s); x.lineTo(r - (s + r) * 0.5, s); x.stroke(); }
-          } else if (kind === 2) {
-            x.beginPath();
-            for (let k = 0; k < 10; k++) { const rad = k % 2? r * 0.45 : r; const a = -Math.PI / 2 + k * Math.PI / 5; x.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); }
-            x.closePath(); x.stroke();
-          } else if (kind === 3) {
-            x.beginPath(); x.arc(0, 0, r, 0, 7); x.stroke();
-            x.beginPath(); x.arc(0, 0, r * 0.55, 0, 7); x.stroke();
-            x.beginPath(); x.arc(0, 0, r * 0.16, 0, 7); x.fill();
-          } else if (kind === 4) {
-            x.strokeRect(-r, -r, r * 2, r * 2);
-            for (let s = -r + 6; s < r; s += 7) { x.beginPath(); x.moveTo(-r, s); x.lineTo(r, s); x.stroke(); }
-          } else if (kind === 5) {
-            for (let k = -1; k <= 1; k++) { x.beginPath(); x.moveTo(-r, k * r * 0.5 + r * 0.4); x.lineTo(0, k * r * 0.5 - r * 0.4); x.lineTo(r, k * r * 0.5 + r * 0.4); x.stroke(); }
-          } else {
-            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, 0); x.lineTo(0, r); x.lineTo(-r, 0); x.closePath(); x.stroke();
-          }
-          x.restore();
-        }
-      }
-
-      /* ---------- gold foil frame + corner نقوش (drawn into colour / metal / rough) ---------- */
-      const FOIL_LINE = "#d4af6e"; // brighter gold for readable trim on navy
-      function strokeGoldFrame(x, w, h, inset, lineW) {
-        const m = inset == null ? Math.round(Math.min(w, h) * 0.048) : inset;
-        const lw = lineW == null ? Math.max(4, Math.round(Math.min(w, h) * 0.022)) : lineW;
-        x.lineJoin = "miter";
+      /* ---------- lid-only gold foil: rounded-square rim (glossy metal) ---------- */
+      const FOIL_LINE = "#d4af6e";
+      function strokeGoldRoundFrame(x, w, h) {
+        const inset = Math.round(Math.min(w, h) * 0.05);
+        const lineW = Math.max(6, Math.round(Math.min(w, h) * 0.028));
+        const rad = Math.round(Math.min(w, h) * 0.07);
+        const fx = inset, fy = inset, fw = w - inset * 2, fh = h - inset * 2;
+        const r = Math.min(rad, fw / 2, fh / 2);
         x.strokeStyle = FOIL_LINE;
-        // outer solid band (reads as a continuous gold rim around every face)
-        x.lineWidth = lw;
-        x.strokeRect(m, m, w - m * 2, h - m * 2);
-        x.lineWidth = Math.max(2, lw * 0.4);
-        const m2 = m + lw * 1.85;
-        x.strokeRect(m2, m2, w - m2 * 2, h - m2 * 2);
-      }
-      function paintCornerOrnament(x, ox, oy, s, flipX, flipY) {
-        x.save();
-        x.translate(ox, oy);
-        x.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-        x.strokeStyle = FOIL_LINE; x.fillStyle = FOIL_LINE;
-        x.lineWidth = Math.max(2.2, s * 0.1);
-        // L-bracket flourish
+        x.lineWidth = lineW;
+        x.lineJoin = "round";
         x.beginPath();
-        x.moveTo(0, s * 0.98); x.lineTo(0, 0); x.lineTo(s * 0.98, 0);
+        x.moveTo(fx + r, fy);
+        x.arcTo(fx + fw, fy, fx + fw, fy + fh, r);
+        x.arcTo(fx + fw, fy + fh, fx, fy + fh, r);
+        x.arcTo(fx, fy + fh, fx, fy, r);
+        x.arcTo(fx, fy, fx + fw, fy, r);
+        x.closePath();
         x.stroke();
-        // inner arc curl
-        x.beginPath();
-        x.moveTo(s * 0.2, s * 0.62);
-        x.quadraticCurveTo(s * 0.2, s * 0.2, s * 0.62, s * 0.2);
-        x.stroke();
-        // second curl
-        x.beginPath();
-        x.moveTo(s * 0.32, s * 0.72);
-        x.quadraticCurveTo(s * 0.32, s * 0.32, s * 0.72, s * 0.32);
-        x.stroke();
-        // diamond medallion
-        x.beginPath();
-        x.moveTo(s * 0.38, s * 0.14); x.lineTo(s * 0.5, s * 0.26);
-        x.lineTo(s * 0.38, s * 0.38); x.lineTo(s * 0.26, s * 0.26);
-        x.closePath(); x.stroke();
-        x.beginPath(); x.arc(s * 0.14, s * 0.14, Math.max(1.8, s * 0.055), 0, 7); x.fill();
-        x.restore();
       }
-      function paintOrnaments(x, w, h, clearCenter) {
-        const m = Math.round(Math.min(w, h) * 0.048);
-        const lw = Math.max(4, Math.round(Math.min(w, h) * 0.022));
-        strokeGoldFrame(x, w, h, m, lw);
-        const cs = Math.round(Math.min(w, h) * 0.2);
-        const pad = m + Math.round(lw * 0.6);
-        paintCornerOrnament(x, pad, pad, cs, false, false);
-        paintCornerOrnament(x, w - pad, pad, cs, true, false);
-        paintCornerOrnament(x, pad, h - pad, cs, false, true);
-        paintCornerOrnament(x, w - pad, h - pad, cs, true, true);
-        // mid-side medallions — ties the trim around all faces
-        x.strokeStyle = FOIL_LINE; x.fillStyle = FOIL_LINE;
-        x.lineWidth = Math.max(2, Math.min(w, h) * 0.01);
-        const tick = Math.min(w, h) * 0.055;
-        [[w / 2, m + lw * 0.5], [w / 2, h - m - lw * 0.5], [m + lw * 0.5, h / 2], [w - m - lw * 0.5, h / 2]].forEach(([cx, cy], i) => {
-          x.beginPath();
-          if (i < 2) { x.moveTo(cx - tick, cy); x.lineTo(cx + tick, cy); }
-          else { x.moveTo(cx, cy - tick); x.lineTo(cx, cy + tick); }
-          x.stroke();
-          x.beginPath(); x.arc(cx, cy, Math.max(2, tick * 0.28), 0, 7); x.fill();
-        });
-        if (clearCenter) {
-          const cw = w * 0.48, ch = h * 0.38;
-          x.fillStyle = NAVY;
-          x.fillRect((w - cw) / 2, (h - ch) / 2, cw, ch);
-        }
-      }
-      /* navy face with gold frame + ornaments; optional LIVE foil maps */
-      function navyOrnamentMaps(wPx, hPx, clearCenter) {
+      /* navy lid top: single glossy gold rounded frame (no corner نقوش) */
+      function navyLidFrameMaps(wPx, hPx) {
         const base = document.createElement("canvas"); base.width = wPx; base.height = hPx;
         const bx = base.getContext("2d");
         bx.fillStyle = NAVY; bx.fillRect(0, 0, wPx, hPx);
-        paintOrnaments(bx, wPx, hPx, clearCenter);
+        strokeGoldRoundFrame(bx, wPx, hPx);
         paperGrain(bx, wPx, hPx, 0.4);
 
         const rgh = document.createElement("canvas"); rgh.width = wPx; rgh.height = hPx;
@@ -396,13 +337,12 @@
         const met = document.createElement("canvas"); met.width = wPx; met.height = hPx;
         const mtx = met.getContext("2d");
         mtx.fillStyle = "#000000"; mtx.fillRect(0, 0, wPx, hPx);
-        // stamp gold pixels → glossy metal (sample colour canvas)
+        // gold pixels → glossy metal foil
         const id = bx.getImageData(0, 0, wPx, hPx);
         const rd = rx.getImageData(0, 0, wPx, hPx);
         const md = mtx.getImageData(0, 0, wPx, hPx);
         for (let i = 0; i < id.data.length; i += 4) {
           const r = id.data[i], g = id.data[i + 1], b = id.data[i + 2];
-          // gold-ish pixels (logo gold + brighter FOIL_LINE trim)
           if (r > 130 && g > 95 && b < 160 && r > b + 25) {
             rd.data[i] = rd.data[i + 1] = rd.data[i + 2] = 18;
             md.data[i] = md.data[i + 1] = md.data[i + 2] = 245;
@@ -419,70 +359,6 @@
           return t;
         };
         return { map: toTexture(base), rough: dataTex(rgh), metal: dataTex(met) };
-      }
-      function navyOrnamentTex(wPx, hPx, clearCenter) {
-        return navyOrnamentMaps(wPx, hPx, clearCenter).map;
-      }
-
-      /* navy end wall: gold frame + gold geometric shape row */
-      function pinkEndTexture(wPx, hPx) {
-        const c = document.createElement("canvas");
-        c.width = wPx; c.height = hPx;
-        const x = c.getContext("2d");
-        x.fillStyle = PINK;
-        x.fillRect(0, 0, wPx, hPx);
-        strokeGoldFrame(x, wPx, hPx);
-        x.strokeStyle = FOIL_LINE; x.fillStyle = FOIL_LINE;
-        x.lineWidth = Math.max(2, wPx * 0.004);
-        const r = hPx * 0.12, cy = hPx * 0.5, count = 6, gap = wPx / (count + 1);
-        for (let i = 1; i <= count; i++) {
-          const cx = gap * i, kind = i % 6;
-          x.save(); x.translate(cx, cy);
-          if (kind === 1) {
-            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, r); x.lineTo(-r, r); x.closePath(); x.stroke();
-          } else if (kind === 2) {
-            x.beginPath();
-            for (let k = 0; k < 10; k++) { const rad = k % 2 ? r * 0.45 : r; const a = -Math.PI / 2 + k * Math.PI / 5; x.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); }
-            x.closePath(); x.stroke();
-          } else if (kind === 3) {
-            x.beginPath(); x.arc(0, 0, r, 0, 7); x.stroke();
-            x.beginPath(); x.arc(0, 0, r * 0.55, 0, 7); x.stroke();
-          } else if (kind === 4) {
-            x.strokeRect(-r, -r, r * 2, r * 2);
-          } else if (kind === 5) {
-            for (let k = -1; k <= 1; k++) { x.beginPath(); x.moveTo(-r, k * r * 0.5 + r * 0.4); x.lineTo(0, k * r * 0.5 - r * 0.4); x.lineTo(r, k * r * 0.5 + r * 0.4); x.stroke(); }
-          } else {
-            x.beginPath(); x.moveTo(0, -r); x.lineTo(r, 0); x.lineTo(0, r); x.lineTo(-r, 0); x.closePath(); x.stroke();
-          }
-          x.restore();
-        }
-        paperGrain(x, wPx, hPx, 0.5);
-        return toTexture(c);
-      }
-
-      /* the wide lock tab face: navy + gold logo, mirrored for extrude UV */
-      function tabLogoTexture(wPx, hPx) {
-        const c = document.createElement("canvas");
-        c.width = wPx; c.height = hPx;
-        const x = c.getContext("2d");
-        x.fillStyle = CYAN;
-        x.fillRect(0, 0, wPx, hPx);
-        const logo = logoGold || logoColored || logoWhite;
-        if (logo) {
-          const lgW = logo.naturalWidth || logo.width, lgH = logo.naturalHeight || logo.height;
-          const ratio = lgH / lgW;
-          const lw = Math.round(wPx * 0.24), lh = Math.round(lw * ratio);
-          x.save();
-          // the cap face maps the canvas VERTICALLY flipped (hinge = canvas
-          // bottom), so pre-flip vertically and place at canvas 0.66 → the
-          // logo lands upright in the tab's UPPER third when the box is closed
-          x.translate(wPx / 2, hPx * 0.8);   // higher on the tab — fully clear of the finger notch
-          x.scale(1, -1);
-          x.drawImage(logo, -lw / 2, -lh / 2, lw, lh);
-          x.restore();
-        }
-        paperGrain(x, wPx, hPx, 0.4);
-        return toTexture(c);
       }
 
       /* inside-of-lid: white + gold logo + a small "OPEN" tab mark */
@@ -769,25 +645,23 @@
       const trayGroup = new THREE.Group();
 
       const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
-      // gold frame wraps every exterior face; lid + floor get full corner نقوش
-      const lidTopMaps = navyOrnamentMaps(1400, 900, true);   // upper lid — frame + ornaments, clear logo zone
-      const floorBotMaps = navyOrnamentMaps(1400, 900, false); // lower base exterior — full gold trim
-      const wallLongMaps = navyOrnamentMaps(1400, 480, true);  // front/back — frame, room for logo
-      const wallEndMaps = navyOrnamentMaps(900, 480, false);   // left/right ends — full trim
-      const edgeMaps = navyOrnamentMaps(512, 512, false);      // small edge faces
-      const tabMaps = foilTabMaps(1400, 300); // lock tab + gold foil (UV-mapped face)
+      const navyTex = plainPanel(1024, 1024, NAVY, 0.5);
+      // gold on lid rim + logos; white ornaments on the side faces
+      const lidTopMaps = navyLidFrameMaps(1400, 900);   // upper lid — rounded gold frame only
+      const tabMaps = foilTabMaps(1400, 300); // lock tab + gold foil logo
+      const sideOrnTex = sideOrnamentTexture(1400, 440); // left/right ends — white frame + shapes
       const lidInTex = plainPanel(1024, 1024, WHITE, 0.4);   // interior: plain white
       const creaseInnerTex = creasedInnerTexture(1400, 300, BOX_W); // long-wall interior + corner glue creases
-      const pinkTabTex = pinkEndTexture(1400, 440); // short lock tabs: navy + gold shapes
       const oMat = (maps) => foilMat(maps);
-      const edgeMat = () => oMat(edgeMaps);
+      const navyMat = () => cardMat(navyTex);
+      const sideOrnMat = () => cardMat(sideOrnTex);
 
       /* ---------- floor ---------- */
       const floor = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, FLOOR_T, BOX_D), [
-        edgeMat(), edgeMat(),
+        navyMat(), navyMat(),
         cardMat(whiteTex),          // +y interior white
-        oMat(floorBotMaps),         // -y lower cover — gold frame + نقوش
-        edgeMat(), edgeMat()
+        navyMat(),                  // -y lower cover — plain navy (no gold)
+        navyMat(), navyMat()
       ]);
       floor.position.y = FLOOR_T / 2;
       floor.castShadow = floor.receiveShadow = true;
@@ -795,17 +669,17 @@
 
       // face order [+x,-x,+y,-y,+z,-z] = [right,left,top,bottom,front,back]
       const wI = () => cardMat(whiteTex); // interior white
-      // back wall — gold frame on -z exterior
+      // back wall — plain navy exterior
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        wI(), wI(), wI(), wI(), cardMat(creaseInnerTex), oMat(wallLongMaps)
+        wI(), wI(), wI(), wI(), cardMat(creaseInnerTex), navyMat()
       ]);
       backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + T / 2);
       backWall.castShadow = backWall.receiveShadow = true;
       trayGroup.add(backWall);
 
-      // front wall — gold frame + LIVE gold foil logo decal on +z
+      // front wall — plain navy + LIVE gold foil logo decal on +z
       const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        wI(), wI(), wI(), wI(), oMat(wallLongMaps), cardMat(creaseInnerTex)
+        wI(), wI(), wI(), wI(), navyMat(), cardMat(creaseInnerTex)
       ]);
       frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - T / 2);
       frontWall.castShadow = frontWall.receiveShadow = true;
@@ -816,16 +690,16 @@
         frontWall.add(frontFoil);
       }
 
-      // left / right ends — gold frame wrapping the box
+      // left / right ends — navy + white ornaments (frame + shape row)
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        wI(), oMat(wallEndMaps), wI(), wI(), wI(), wI()
+        wI(), sideOrnMat(), wI(), wI(), wI(), wI()
       ]);
       leftWall.position.set(-BOX_W / 2 + T / 2, BOX_H / 2 + FLOOR_T, 0);
       leftWall.castShadow = leftWall.receiveShadow = true;
       trayGroup.add(leftWall);
 
       const rightWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        oMat(wallEndMaps), wI(), wI(), wI(), wI(), wI()
+        sideOrnMat(), wI(), wI(), wI(), wI(), wI()
       ]);
       rightWall.position.set(BOX_W / 2 - T / 2, BOX_H / 2 + FLOOR_T, 0);
       rightWall.castShadow = rightWall.receiveShadow = true;
@@ -837,12 +711,12 @@
       lidPivot.position.set(0, TOP_Y, -BOX_D / 2 + T);
       trayGroup.add(lidPivot);
 
-      // lid — gold frame + نقوش on top; LIVE foil logo; white interior
+      // lid — rounded gold frame on top + LIVE foil logo; white interior
       const lid = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, T, BOX_D), [
-        edgeMat(), edgeMat(),
-        oMat(lidTopMaps),           // +y upper lid ornaments
+        navyMat(), navyMat(),
+        oMat(lidTopMaps),           // +y rounded gold foil frame
         cardMat(lidInTex),
-        edgeMat(), edgeMat()
+        navyMat(), navyMat()
       ]);
       lid.position.set(0, T / 2, BOX_D / 2); // extends forward from the hinge
       lid.castShadow = lid.receiveShadow = true;
@@ -869,7 +743,7 @@
       lidPivot.add(tuckPivot);
       const tuck = new THREE.Mesh(
         notchedTabGeometry(BOX_W, TUCK_H, T, BOX_H * 0.3), // finger notch on the free edge
-        [foilMat(tabMaps), edgeMat()] // outer cap = gold foil mark, edges = gold-trimmed navy
+        [foilMat(tabMaps), navyMat()] // outer cap = gold foil logo, edges = plain navy
       );
       tuck.position.set(0, 0, 0); // extends out → after the pivot fold, hangs DOWN over the outside
       tuck.castShadow = tuck.receiveShadow = true;
@@ -885,14 +759,9 @@
       tuckLiner.position.set(0, -T * 0.45, 0);   // just behind the inner cap
       tuckPivot.add(tuckLiner);
 
-      // two side tabs — hinge at the lid's left/right edges, full depth + full
-      // height, meeting the front tab at the front corners (connected skirt).
-      // The big +y/-y faces run x(short)×z(long), so the pattern texture must
-      // be ROTATED 90° to align its shape row with the long z-axis (otherwise
-      // the shapes get stretched into an unreadable mess)
-      const pinkTabFace = pinkEndTexture(1400, 440);
-      pinkTabFace.center.set(0.5, 0.5); pinkTabFace.rotation = Math.PI / 2;
-      const pinkTabEdge = () => edgeMat();
+      // two side tabs — white ornaments on outer face (rotated to follow long z-axis)
+      const sideTabFace = sideOrnamentTexture(1400, 440);
+      sideTabFace.center.set(0.5, 0.5); sideTabFace.rotation = Math.PI / 2;
       const sideTucks = [];
       [-1, 1].forEach((sx) => {
         const p = new THREE.Group();
@@ -900,10 +769,10 @@
         p.rotation.z = -sx * Math.PI / 2; // fold down over the outer side face
         lidPivot.add(p);
         const st = new THREE.Mesh(new THREE.BoxGeometry(TUCK_H, T, BOX_D), [
-          pinkTabEdge(), pinkTabEdge(),
-          cardMat(pinkTabFace),                          // +y = OUTER face: navy + gold frame/shapes
-          cardMat(plainPanel(512, 512, WHITE, 0.4)),     // -y = INNER face: plain white
-          pinkTabEdge(), pinkTabEdge()
+          navyMat(), navyMat(),
+          cardMat(sideTabFace),                              // +y = OUTER: white frame + shapes
+          cardMat(plainPanel(512, 512, WHITE, 0.4)),         // -y = INNER face: plain white
+          navyMat(), navyMat()
         ]);
         st.position.set(sx * TUCK_H / 2, 0, 0); // extends out → hangs down full height after fold
         st.castShadow = st.receiveShadow = true;

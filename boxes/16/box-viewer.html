@@ -184,10 +184,11 @@
 
       /* sleeve-top maps: matte graphite base + the Mozaik mark (rotated to a
          PORTRAIT lockup, pulled IN from the edges) rendered as a SPOT-UV panel —
-         GLOSSY (low roughness) and very, very slightly RAISED (a tiny bump) over
-         the surrounding matte board. Returns { map, rough, bump }. */
-      function makeSpotUVMaps(wPx, hPx, frac, rot, baseCol) {
+         GLOSSY (low roughness) and RAISED (bump) over the surrounding matte board.
+         opts.glossFrame → rounded-rect varnish rim on the face edges (top only). */
+      function makeSpotUVMaps(wPx, hPx, frac, rot, baseCol, opts) {
         rot = rot || 0;
+        opts = opts || {};
         baseCol = baseCol || WHITE;               // board colour (graphite by default, green for the drawer)
         const portrait = Math.abs(rot) > 0.01;   // portrait lockup → size off the height
         const base = document.createElement("canvas"); base.width = wPx; base.height = hPx;
@@ -199,7 +200,7 @@
         const rx = rgh.getContext("2d");
         rx.fillStyle = "#f6f6f6"; rx.fillRect(0, 0, wPx, hPx);      // ~0.96 → board effectively matte (no reflection)
 
-        // bump: neutral grey (flat) everywhere, faintly brighter (raised) on the mark
+        // bump: neutral grey (flat) everywhere, brighter (raised) on the mark / frame
         const bmp = document.createElement("canvas"); bmp.width = wPx; bmp.height = hPx;
         const mpx = bmp.getContext("2d");
         mpx.fillStyle = "#808080"; mpx.fillRect(0, 0, wPx, hPx);
@@ -213,6 +214,38 @@
         const dsp = document.createElement("canvas"); dsp.width = wPx; dsp.height = hPx;
         const dpx = dsp.getContext("2d");
         dpx.fillStyle = "#000000"; dpx.fillRect(0, 0, wPx, hPx);
+
+        /* glossy rounded-square rim hugging the face edges (spot-UV varnish) */
+        const strokeGlossFrame = (ctx, col, blurPx) => {
+          const inset = Math.round(Math.min(wPx, hPx) * 0.048);
+          const lineW = Math.max(6, Math.round(Math.min(wPx, hPx) * 0.034));
+          const rad = Math.round(Math.min(wPx, hPx) * 0.075);
+          const x = inset, y = inset, fw = wPx - inset * 2, fh = hPx - inset * 2;
+          const r = Math.min(rad, fw / 2, fh / 2);
+          ctx.save();
+          if (blurPx) ctx.filter = "blur(" + blurPx + "px)";
+          ctx.strokeStyle = col;
+          ctx.lineWidth = lineW;
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + fw, y, x + fw, y + fh, r);
+          ctx.arcTo(x + fw, y + fh, x, y + fh, r);
+          ctx.arcTo(x, y + fh, x, y, r);
+          ctx.arcTo(x, y, x + fw, y, r);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
+        };
+
+        if (opts.glossFrame) {
+          // faint light edge so the rim reads on navy; shine comes from rough/metal/bump
+          strokeGlossFrame(bx, "rgba(255,255,255,0.11)", 0);
+          strokeGlossFrame(rx, "#161619", 0);
+          strokeGlossFrame(mpx, "#e4e4e8", 1.5);
+          strokeGlossFrame(mtx, "#242424", 0);
+          strokeGlossFrame(dpx, "#ffffff", 1.5);
+        }
 
         if (logoArt) {
           const ratio = logoArt.naturalHeight / logoArt.naturalWidth;
@@ -232,17 +265,18 @@
             ctx.save(); ctx.translate(wPx / 2, hPx / 2); ctx.rotate(rot);
             ctx.drawImage(img, -lw / 2, -lh / 2, lw, lh); ctx.restore();
           };
-          place(bx, logoArt);             // colour → the tonal-grey mark
+          place(bx, logoArt);             // colour → full-colour / tonal mark
           place(rx, stencil("#161619"));  // gloss  → very smooth (~0.08) → sharp reflection
-          // emboss → a white plateau with soft (blurred) bevel edges: the mark reads
-          // as clearly RAISED, and the sloped edges catch the light
-          mpx.save(); mpx.filter = "blur(3px)"; place(mpx, stencil("#ffffff")); mpx.restore();
-          place(mtx, stencil("#1c1c1c")); // metal → low (~0.11) so the FULL-COLOUR logo stays readable (colour variant)
-          // displacement height field — soft bevel so the raised edges slope, not cliff
-          dpx.save(); dpx.filter = "blur(2px)"; place(dpx, stencil("#ffffff")); dpx.restore();
+          // stronger emboss — brighter bump stencil so the raise reads clearly
+          mpx.save(); mpx.filter = "blur(1.5px)"; place(mpx, stencil("#ececf0")); mpx.restore();
+          place(mtx, stencil("#1c1c1c")); // metal → low (~0.11) so the FULL-COLOUR logo stays readable
+          dpx.save(); dpx.filter = "blur(1.5px)"; place(dpx, stencil("#ffffff")); dpx.restore();
         }
         paperGrain(bx, wPx, hPx, 0.4);
-        return { map: toTexture(base), rough: toTexture(rgh), bump: toTexture(bmp),
+        const bumpT = new THREE.CanvasTexture(bmp);
+        bumpT.encoding = THREE.LinearEncoding;
+        bumpT.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return { map: toTexture(base), rough: toTexture(rgh), bump: bumpT,
                  metal: toTexture(met), disp: toTexture(dsp) };
       }
 
@@ -275,7 +309,7 @@
 
       const whiteTex   = plainPanel(1024, 1024, WHITE, 0.5);
       const blueTex    = plainPanel(1024, 1024, BLUE, 0.32);
-      const topMaps   = makeSpotUVMaps(560, 860, 0.5, -Math.PI / 2);   // portrait mark on the top, pulled in from the edges
+      const topMaps   = makeSpotUVMaps(560, 860, 0.5, -Math.PI / 2, WHITE, { glossFrame: true }); // top + glossy rim
       const sideMaps  = makeSpotUVMaps(1120, 200, 0.28, 0);            // landscape mark on the long side walls
       const frontMaps = makeSpotUVMaps(1120, 316, 0.30, 0, BLUE);      // landscape mark on the GREEN drawer front
 
@@ -295,10 +329,10 @@
       const sleeve = new THREE.Group();
       boxGroup.add(sleeve);
 
-      // spot-UV material: FLAT glossy varnish — the raised relief (displacement + bump/emboss) is removed;
-      // the shine comes purely from the low-roughness logo areas reflecting the studio environment
+      // spot-UV: glossy varnish + clearer raised feel (bump only — no heavy displacement)
       const spotMat = (maps) => new THREE.MeshStandardMaterial({
         map: maps.map, roughnessMap: maps.rough, metalnessMap: maps.metal,
+        bumpMap: maps.bump, bumpScale: 0.014,
         metalness: 1.0, roughness: 1.0,
         envMapIntensity: 2.4, side: THREE.DoubleSide
       });
