@@ -145,7 +145,7 @@
         return toTexture(c);
       }
 
-      const panelMat = (tex) => new THREE.MeshStandardMaterial({ map: tex, metalness: 0.1, roughness: 0.62, side: THREE.DoubleSide });
+      const panelMat = (tex) => new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }); // unlit — flat colours, no lighting effect
 
       /* =========================================================
          GEOMETRY — a SYRUP MEDICINE carton (şurup ilaç kutusu):
@@ -211,7 +211,7 @@
       // ---- navy body: a HOLLOW tube (open top) + a bottom cap, so the white
       //      interior shows when the lid lifts. Envmap kept low → deep navy. ----
       const TWALL = 0.02;    // thin cardboard wall
-      const bodyMat = new THREE.MeshStandardMaterial({ color: WHITE, metalness: 0.04, roughness: 0.82, envMapIntensity: 0.3 });
+      const bodyMat = new THREE.MeshBasicMaterial({ color: WHITE });
       const body = new THREE.Mesh(roundedTubeGeo(W, H, D, R, BEV, TWALL), bodyMat);
       carton.add(body);
       const baseCap = new THREE.Mesh(roundedBoxGeo(W - 0.01, TWALL, D - 0.01, R, BEV * 0.5), bodyMat);
@@ -220,10 +220,10 @@
 
       // ---- printed decal panels on all four walls + bottom ----
       // WHITE background on every (square) face; keep the sky-blue frame + coloured logo
-      const frontTex = panelTexture(620, 1400, WHITE, SKY, false, 0.7);
-      const backTex = panelTexture(620, 1400, WHITE, SKY, false, 0.7);
-      const sideTex = panelTexture(620, 1400, WHITE, SKY, false, 0.7);   // sides now equal the big faces
-      const bottomTex = panelTexture(700, 700, WHITE, SKY, false, 0.62);  // square base
+      const frontTex = panelTexture(620, 1400, WHITE, NAVY, false, 0.7);
+      const backTex = panelTexture(620, 1400, WHITE, NAVY, false, 0.7);
+      const sideTex = panelTexture(620, 1400, WHITE, NAVY, false, 0.7);   // sides now equal the big faces
+      const bottomTex = panelTexture(700, 700, NAVY, WHITE, true, 0.62);  // navy base, white logo (matches the top)
 
       function decal(tex, w, h) {
         return new THREE.Mesh(new THREE.PlaneGeometry(w, h), panelMat(tex));
@@ -248,7 +248,7 @@
       // inset a hair inside the navy inner wall so the white clearly covers it (no z-fighting)
       const innerHalfX = hw - TWALL - 0.015, innerHalfZ = hd - TWALL - 0.015;
       // emissive lift keeps the interior reading WHITE even deep in shadow
-      const innerMat = new THREE.MeshStandardMaterial({ color: WHITE, emissive: 0xe8eef4, emissiveIntensity: 0.55, metalness: 0.04, roughness: 0.92, side: THREE.DoubleSide, envMapIntensity: 0.4 });
+      const innerMat = new THREE.MeshBasicMaterial({ color: WHITE, side: THREE.DoubleSide });
       const topY = EY - 0.006, botY = -EY + TWALL;
       const wellH = topY - botY, midY = (topY + botY) / 2;
       const innerWell = new THREE.Group();
@@ -271,7 +271,8 @@
       carton.add(lidPivot);
 
       // every closure part is plain WHITE board — top face, underside, edges, no exception
-      const whiteBoard = new THREE.MeshStandardMaterial({ color: WHITE, emissive: 0xdbe3ec, emissiveIntensity: 0.32, metalness: 0.03, roughness: 0.9, side: THREE.DoubleSide, envMapIntensity: 0.3 });
+      const whiteBoard = new THREE.MeshBasicMaterial({ color: WHITE, side: THREE.DoubleSide });
+      const navyBoard = new THREE.MeshBasicMaterial({ color: NAVY, side: THREE.DoubleSide });
       const lidT = TWALL;                          // same thin cardboard as every other panel
       const lid = new THREE.Mesh(roundedBoxGeo(2 * EX - 2 * lidBev, lidT, 2 * EZ - 2 * lidBev, R, lidBev), whiteBoard);
       lid.position.set(0, lidT / 2, EZ);           // back edge sits exactly on the hinge — no overhang, no gap
@@ -279,7 +280,7 @@
 
       // sky-blue + Mozaik logo printed on the TOP face only (underside & edges stay white);
       // an identical print goes on the box's bottom face (see bottomTex) for symmetry
-      const lidTopTex = panelTexture(700, 700, WHITE, SKY, false, 0.62);   // square top
+      const lidTopTex = panelTexture(700, 700, NAVY, WHITE, true, 0.62);   // navy top face, white logo
       const lidTop = decal(lidTopTex, 2 * EX - 0.012, 2 * EZ - 0.012); // full top face — no white margin
       lidTop.position.set(0, lidT + eps, EZ);        // sits just above the thin lid's top surface
       lidTop.rotation.x = -Math.PI / 2;
@@ -295,7 +296,7 @@
       // crease angle in applyFold swings it from trailing (open) to tucked-down (closed)
       const tuck = new THREE.Mesh(
         roundedBoxGeo(2 * pmX, TWALL, 0.40, 0.02, 0.006),
-        whiteBoard
+        navyBoard
       );
       tuck.position.set(0, 0, 0.20);
       tuckPivot.add(tuck);
