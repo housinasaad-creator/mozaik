@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D Kutu Görüntüleyicisi — Şurup İlaç Kutusu</title>
+  <link rel="stylesheet" href="../box.css?v=28" />
+</head>
+<body>
+
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- palette: the Mozaik logo's own colours ---------- */
+    const NAVY = "#15294e";   // كحلي
+    const SKY = "#38a8de";    // سماوي
+    const SKY_D = "#2a86b8";
+    const WHITE = "#f4f8fb";
+
+    let logoColored = null, logoWhite = null, toLoad = 2;
+    function ready() { if (--toLoad === 0) init(); }
+    const li1 = new Image(); li1.onload = () => { logoColored = li1; ready(); }; li1.onerror = ready; li1.src = "assets/mozaik-logo-colored.png";
+    const li2 = new Image(); li2.onload = () => { logoWhite = li2; ready(); }; li2.onerror = ready; li2.src = "assets/mozaik-logo-white.png";
+
+    function init() {
+      console.log("init, logos:", !!logoColored, !!logoWhite);
+
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setClearColor(0x000000, 0);
+      var __mzkWeak = (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || matchMedia("(prefers-reduced-motion: reduce)").matches;
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, __mzkWeak ? 1 : 1.5));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 2.4, 8.2);
+      camera.lookAt(0, 0.1, 0);
+
+      function fitToContainer() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fitToContainer();
+      if (window.ResizeObserver) new ResizeObserver(fitToContainer).observe(document.body);
+      addEventListener("resize", fitToContainer);
+
+      /* ---------- environment map for soft coated-carton sheen ---------- */
+      const envC = document.createElement("canvas");
+      envC.width = 512; envC.height = 256;
+      const ex = envC.getContext("2d");
+      const grd = ex.createLinearGradient(0, 0, 0, 256);
+      grd.addColorStop(0, "#ffffff");
+      grd.addColorStop(0.45, "#dfeef8");
+      grd.addColorStop(0.7, "#9fc4dc");
+      grd.addColorStop(1, "#20344f");
+      ex.fillStyle = grd;
+      ex.fillRect(0, 0, 512, 256);
+      ex.fillStyle = "rgba(255,255,255,0.6)";
+      ex.beginPath(); ex.arc(120, 60, 34, 0, 7); ex.fill();
+      ex.beginPath(); ex.arc(340, 70, 40, 0, 7); ex.fill();
+      const envTex = new THREE.CanvasTexture(envC);
+      envTex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envRT = pmrem.fromEquirectangular(envTex);
+      scene.environment = envRT.texture;
+      envTex.dispose();
+      pmrem.dispose();
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x2a3550, 0.62));
+      const key = new THREE.DirectionalLight(0xffffff, 0.5);
+      key.position.set(4, 8, 5); scene.add(key);
+      const fill = new THREE.DirectionalLight(0xdfeeff, 0.22);
+      fill.position.set(-5, 3, -4); scene.add(fill);
+      const rim = new THREE.DirectionalLight(0xbfe0ff, 0.2);
+      rim.position.set(0, 2, -6); scene.add(rim);
+
+      /* ---------- helpers ---------- */
+      function toTexture(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+
+      function roundRectPath(x, ctx, X, Y, W, H, R) {
+        ctx.beginPath();
+        ctx.moveTo(X + R, Y);
+        ctx.arcTo(X + W, Y, X + W, Y + H, R);
+        ctx.arcTo(X + W, Y + H, X, Y + H, R);
+        ctx.arcTo(X, Y + H, X, Y, R);
+        ctx.arcTo(X, Y, X + W, Y, R);
+        ctx.closePath();
+      }
+
+      /* a printed carton panel: coloured ground + a sky/navy double frame
+         + the Mozaik logo centred. Used on EVERY face (logo on all sides). */
+      function panelTexture(wPx, hPx, bg, frame, useWhite, logoFrac) {
+        const c = document.createElement("canvas");
+        c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = bg;
+        x.fillRect(0, 0, wPx, hPx);
+
+        const m = Math.min(wPx, hPx) * 0.09;
+        const R = Math.min(wPx, hPx) * 0.06;
+        x.strokeStyle = frame;
+        x.lineWidth = Math.max(3, Math.min(wPx, hPx) * 0.018);
+        roundRectPath(x, x, m, m, wPx - 2 * m, hPx - 2 * m, R);
+        x.stroke();
+        x.lineWidth = Math.max(1.5, Math.min(wPx, hPx) * 0.007);
+        const g = m * 0.42;
+        roundRectPath(x, x, m + g, m + g, wPx - 2 * (m + g), hPx - 2 * (m + g), R * 0.7);
+        x.stroke();
+
+        // little corner dots for a pharma-print feel
+        x.fillStyle = frame;
+        [[m + g * 1.4, m + g * 1.4], [wPx - m - g * 1.4, m + g * 1.4],
+         [m + g * 1.4, hPx - m - g * 1.4], [wPx - m - g * 1.4, hPx - m - g * 1.4]].forEach(p => {
+          x.beginPath(); x.arc(p[0], p[1], Math.min(wPx, hPx) * 0.012, 0, 7); x.fill();
+        });
+
+        const logo = useWhite ? (logoWhite || logoColored) : (logoColored || logoWhite);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(wPx * (logoFrac || 0.6));
+          const lh = Math.round(lw * ratio);
+          x.drawImage(logo, (wPx - lw) / 2, (hPx - lh) / 2, lw, lh);
+        }
+        return toTexture(c);
+      }
+
+      const panelMat = (tex) => new THREE.MeshStandardMaterial({ map: tex, metalness: 0.1, roughness: 0.62, side: THREE.DoubleSide });
+
+      /* =========================================================
+         GEOMETRY — a SYRUP MEDICINE carton (şurup ilaç kutusu):
+         a tall slim navy folding box printed with the sky-blue
+         Mozaik mark on every face. All twelve edges carry a
+         hair-fine chamfer (barely visible) so no seam meets at a
+         hard right angle. A back-hinged top lid + tuck tongue
+         open and close on the slider.
+         ========================================================= */
+      const W = 1.5, H = 3.5, D = 1.5;           // square base (W = D), same tall height — all 4 side faces equal
+      const R = 0.01, BEV = 0.005;               // barely-there corner radius + top/bottom chamfer
+      const hw = W / 2, hh = H / 2, hd = D / 2;
+      // ExtrudeGeometry's bevelSize pushes the footprint OUT by BEV on X & Z, so
+      // the real wall sits at these effective half-extents (height is exact):
+      const EX = hw + BEV, EZ = hd + BEV, EY = hh;
+
+      // trace a centred rounded rectangle onto a Shape / Path
+      function roundedRect(p, w, d, r) {
+        const x0 = -w / 2, y0 = -d / 2;
+        p.moveTo(x0 + r, y0);
+        p.lineTo(x0 + w - r, y0);
+        p.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
+        p.lineTo(x0 + w, y0 + d - r);
+        p.quadraticCurveTo(x0 + w, y0 + d, x0 + w - r, y0 + d);
+        p.lineTo(x0 + r, y0 + d);
+        p.quadraticCurveTo(x0, y0 + d, x0, y0 + d - r);
+        p.lineTo(x0, y0 + r);
+        p.quadraticCurveTo(x0, y0, x0 + r, y0);
+      }
+
+      function extrudeUpright(shape, h, bev) {
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: h - 2 * bev, bevelEnabled: true,
+          bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 5
+        });
+        geo.rotateX(-Math.PI / 2);
+        geo.center();
+        return geo;
+      }
+
+      // rounded-rectangle prism with a soft chamfer on every edge
+      function roundedBoxGeo(w, h, d, r, bev) {
+        const s = new THREE.Shape();
+        roundedRect(s, w, d, r);
+        return extrudeUpright(s, h, bev);
+      }
+
+      // hollow rounded tube (open top & bottom) — the printed carton walls
+      function roundedTubeGeo(w, h, d, r, bev, wall) {
+        const s = new THREE.Shape();
+        roundedRect(s, w, d, r);
+        const hole = new THREE.Path();
+        roundedRect(hole, w - 2 * wall, d - 2 * wall, Math.max(0.006, r - wall));
+        s.holes.push(hole);
+        return extrudeUpright(s, h, bev);
+      }
+
+      const boxGroup = new THREE.Group();
+      const carton = new THREE.Group();
+      boxGroup.add(carton);
+      scene.add(boxGroup);
+
+      // ---- navy body: a HOLLOW tube (open top) + a bottom cap, so the white
+      //      interior shows when the lid lifts. Envmap kept low → deep navy. ----
+      const TWALL = 0.02;    // thin cardboard wall
+      const bodyMat = new THREE.MeshStandardMaterial({ color: WHITE, metalness: 0.04, roughness: 0.82, envMapIntensity: 0.3 });
+      const body = new THREE.Mesh(roundedTubeGeo(W, H, D, R, BEV, TWALL), bodyMat);
+      carton.add(body);
+      const baseCap = new THREE.Mesh(roundedBoxGeo(W - 0.01, TWALL, D - 0.01, R, BEV * 0.5), bodyMat);
+      baseCap.position.y = -EY + TWALL / 2;
+      carton.add(baseCap);
+
+      // ---- printed decal panels on all four walls + bottom ----
+      // WHITE background on every (square) face; keep the sky-blue frame + coloured logo
+      const frontTex = panelTexture(620, 1400, WHITE, SKY, false, 0.7);
+      const backTex = panelTexture(620, 1400, WHITE, SKY, false, 0.7);
+      const sideTex = panelTexture(620, 1400, WHITE, SKY, false, 0.7);   // sides now equal the big faces
+      const bottomTex = panelTexture(700, 700, WHITE, SKY, false, 0.62);  // square base
+
+      function decal(tex, w, h) {
+        return new THREE.Mesh(new THREE.PlaneGeometry(w, h), panelMat(tex));
+      }
+      const eps = 0.004;
+      const pmX = EX - R - 0.02;        // print half-width on the W-faces (stay off the rounded corners)
+      const pmZ = EZ - R - 0.02;        // print half-width on the D-faces
+      const pmY = EY - BEV - 0.03;      // print half-height on the tall walls
+
+      const front = decal(frontTex, 2 * pmX, 2 * pmY);
+      front.position.set(0, 0, EZ + eps); carton.add(front);
+      const back = decal(backTex, 2 * pmX, 2 * pmY);
+      back.position.set(0, 0, -EZ - eps); back.rotation.y = Math.PI; carton.add(back);
+      const right = decal(sideTex, 2 * pmZ, 2 * pmY);
+      right.position.set(EX + eps, 0, 0); right.rotation.y = Math.PI / 2; carton.add(right);
+      const left = decal(sideTex, 2 * pmZ, 2 * pmY);
+      left.position.set(-EX - eps, 0, 0); left.rotation.y = -Math.PI / 2; carton.add(left);
+      const bottom = decal(bottomTex, 2 * EX - 0.012, 2 * EZ - 0.012); // full bottom face — matches the top
+      bottom.position.set(0, -EY - eps, 0); bottom.rotation.x = Math.PI / 2; carton.add(bottom);
+
+      // ---- white interior lining (revealed when the lid lifts) ----
+      // inset a hair inside the navy inner wall so the white clearly covers it (no z-fighting)
+      const innerHalfX = hw - TWALL - 0.015, innerHalfZ = hd - TWALL - 0.015;
+      // emissive lift keeps the interior reading WHITE even deep in shadow
+      const innerMat = new THREE.MeshStandardMaterial({ color: WHITE, emissive: 0xe8eef4, emissiveIntensity: 0.55, metalness: 0.04, roughness: 0.92, side: THREE.DoubleSide, envMapIntensity: 0.4 });
+      const topY = EY - 0.006, botY = -EY + TWALL;
+      const wellH = topY - botY, midY = (topY + botY) / 2;
+      const innerWell = new THREE.Group();
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * innerHalfX, 2 * innerHalfZ), innerMat);
+      floor.position.set(0, botY + 0.005, 0); floor.rotation.x = -Math.PI / 2; innerWell.add(floor);
+      const wN = new THREE.Mesh(new THREE.PlaneGeometry(2 * innerHalfX, wellH), innerMat);
+      wN.position.set(0, midY, -innerHalfZ); innerWell.add(wN);
+      const wS = new THREE.Mesh(new THREE.PlaneGeometry(2 * innerHalfX, wellH), innerMat);
+      wS.position.set(0, midY, innerHalfZ); innerWell.add(wS);
+      const wE = new THREE.Mesh(new THREE.PlaneGeometry(2 * innerHalfZ, wellH), innerMat);
+      wE.position.set(innerHalfX, midY, 0); wE.rotation.y = Math.PI / 2; innerWell.add(wE);
+      const wW = new THREE.Mesh(new THREE.PlaneGeometry(2 * innerHalfZ, wellH), innerMat);
+      wW.position.set(-innerHalfX, midY, 0); wW.rotation.y = Math.PI / 2; innerWell.add(wW);
+      carton.add(innerWell);
+
+      /* ---------- top LID hinged at the back top edge ---------- */
+      const lidBev = 0.005;
+      const lidPivot = new THREE.Group();
+      lidPivot.position.set(0, EY, -EZ);            // hinge = back top edge
+      carton.add(lidPivot);
+
+      // every closure part is plain WHITE board — top face, underside, edges, no exception
+      const whiteBoard = new THREE.MeshStandardMaterial({ color: WHITE, emissive: 0xdbe3ec, emissiveIntensity: 0.32, metalness: 0.03, roughness: 0.9, side: THREE.DoubleSide, envMapIntensity: 0.3 });
+      const lidT = TWALL;                          // same thin cardboard as every other panel
+      const lid = new THREE.Mesh(roundedBoxGeo(2 * EX - 2 * lidBev, lidT, 2 * EZ - 2 * lidBev, R, lidBev), whiteBoard);
+      lid.position.set(0, lidT / 2, EZ);           // back edge sits exactly on the hinge — no overhang, no gap
+      lidPivot.add(lid);
+
+      // sky-blue + Mozaik logo printed on the TOP face only (underside & edges stay white);
+      // an identical print goes on the box's bottom face (see bottomTex) for symmetry
+      const lidTopTex = panelTexture(700, 700, WHITE, SKY, false, 0.62);   // square top
+      const lidTop = decal(lidTopTex, 2 * EX - 0.012, 2 * EZ - 0.012); // full top face — no white margin
+      lidTop.position.set(0, lidT + eps, EZ);        // sits just above the thin lid's top surface
+      lidTop.rotation.x = -Math.PI / 2;
+      lidPivot.add(lidTop);
+
+      // tuck tongue on the lid's front edge — creases NATURALLY with the fold:
+      // trails almost in-line when open, swings down and tucks just inside the
+      // front wall as the box closes (angle driven in applyFold)
+      const tuckPivot = new THREE.Group();
+      tuckPivot.position.set(0, 0, 2 * EZ - TWALL);  // hinge at the lid's front edge, a hair inside
+      lidPivot.add(tuckPivot);
+      // tongue is a forward continuation of the lid (extends +Z, thin in Y); the
+      // crease angle in applyFold swings it from trailing (open) to tucked-down (closed)
+      const tuck = new THREE.Mesh(
+        roundedBoxGeo(2 * pmX, TWALL, 0.40, 0.02, 0.006),
+        whiteBoard
+      );
+      tuck.position.set(0, 0, 0.20);
+      tuckPivot.add(tuck);
+
+      // ---- two side dust-flap "ears" hinged on the top edges of the side
+      //      walls: they lie flat over the opening when closed and stand up
+      //      when open, animating with the fold slider ----
+      const earOv = TWALL * 1.5;                    // hinge overlap → welded to the wall, no gap
+      const earLen = innerHalfX * 0.96 + earOv;
+      const earDepth = 2 * innerHalfZ;              // full depth → no gaps at the ends
+      const earGeo = roundedBoxGeo(earLen, TWALL, earDepth, 0.01, 0.006);
+      const earMat = whiteBoard;
+      const earL = new THREE.Group();
+      earL.position.set(-innerHalfX, EY, 0); carton.add(earL);
+      const earLm = new THREE.Mesh(earGeo, earMat); earLm.position.set(earLen / 2 - earOv, 0, 0); earL.add(earLm);
+      const earR = new THREE.Group();
+      earR.position.set(innerHalfX, EY, 0); carton.add(earR);
+      const earRm = new THREE.Mesh(earGeo, earMat); earRm.position.set(-(earLen / 2 - earOv), 0, 0); earR.add(earRm);
+
+      // sit the carton on the ground
+      carton.position.y = 0;
+
+      /* ---------- soft ground shadow ---------- */
+      const shadowCatcher = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 60),
+        new THREE.ShadowMaterial({ opacity: 0.22 })
+      );
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.y = -EY - 0.02;
+      scene.add(shadowCatcher);
+
+      /* ---------- fold state: 0 = lid open, 1 = lid closed ---------- */
+      const OPEN_ANGLE = 1.72;   // ~99° — opens like a real hinge without flinging back past vertical
+      let foldTarget = 0, fold = 0;
+      function applyFold(t) {
+        // PHASE 1 (t 0→0.5): the tongue + the two ears fold in and close FIRST.
+        // PHASE 2 (t 0.5→1): only then does the lid lower shut over them.
+        const eFlap = Math.min(1, t / 0.5);
+        const eLid = Math.max(0, (t - 0.5) / 0.5);
+        earL.rotation.z = (Math.PI / 2) * (1 - eFlap);   // up when open → flat when closed
+        earR.rotation.z = -(Math.PI / 2) * (1 - eFlap);
+        tuckPivot.rotation.x = 0.38 + 1.22 * eFlap;      // tongue tucks with the ears
+        lidPivot.rotation.x = -OPEN_ANGLE * (1 - eLid);  // lid stays open until the flaps are done
+      }
+      applyFold(fold);
+
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
+
+      /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
+      let dragging = false, px = 0, py = 0;
+      const rot = { x: 0.28, y: Math.PI / 6 };
+      boxGroup.rotation.set(rot.x, rot.y, 0);
+
+      function applyZoom(factor) {
+        camera.position.multiplyScalar(factor);
+        const dd = camera.position.length();
+        if (dd < 4.5) camera.position.setLength(4.5);
+        if (dd > 16) camera.position.setLength(16);
+      }
+
+      function down(cx, cy) { dragging = true; px = cx; py = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - px) * 0.011;
+        rot.x += (cy - py) * 0.011;
+        boxGroup.rotation.set(rot.x, rot.y, 0);
+        px = cx; py = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinchDist = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinchDist = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const dd = dist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) applyZoom(1 + (pinchDist - dd) * 0.004);
+          pinchDist = dd;
+          resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
+      addEventListener("touchend", e => {
+        if (e.touches.length < 2) pinchDist = 0;
+        if (e.touches.length === 0) up();
+      }, { passive: false });
+
+      addEventListener("wheel", e => { e.preventDefault(); applyZoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      /* ---------- gentle auto-rotate after idle ---------- */
+      let autoOn = false, idleTimer = null;
+      function resetIdle() {
+        autoOn = false;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { autoOn = true; }, 3000);
+      }
+      resetIdle();
+
+      /* ---------- loop ---------- */
+      addEventListener("message", function (e) { if (e.data === "mzk:pause") window.__mzkPaused = true; else if (e.data === "mzk:resume") window.__mzkPaused = false; });
+      document.addEventListener("visibilitychange", function () { window.__mzkPaused = document.hidden; });
+      (function animate() {
+        requestAnimationFrame(animate);
+        if (window.__mzkPaused) return;
+        if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0006) {
+          fold += (foldTarget - fold) * 0.09;
+          applyFold(fold);
+        }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, boxGroup, carton, lidPivot, lid, camera, scene, renderer,
+        renderOnce: () => renderer.render(scene, camera),
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+
+      console.log("✓ navy syrup medicine box ready");
+    }
+  </script>
+</body>
+</html>
