@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="tr" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Mozaik 3D — Teşhir Standı (5 Raf)</title>
+  <link rel="stylesheet" href="../box.css?v=28" />
+</head>
+<body>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    "use strict";
+
+    /* ---------- Mozaik palette ---------- */
+    const NAVY = "#172c50";
+    const NAVY_D = "#0f1d36";
+    const NAVY2 = "#213b64";
+    const SKY = "#39a8de";
+    const LIGHT = "#e9f1f8";
+
+    let logoWhite = null, logoColored = null, toLoad = 2;
+    function ready() { if (--toLoad === 0) init(); }
+    const li1 = new Image(); li1.onload = () => { logoWhite = li1; ready(); }; li1.onerror = ready; li1.src = "assets/mozaik-logo-white.png";
+    const li2 = new Image(); li2.onload = () => { logoColored = li2; ready(); }; li2.onerror = ready; li2.src = "assets/mozaik-logo-colored.png";
+
+    function init() {
+      /* ---------- renderer ---------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setClearColor(0x000000, 0);
+      var weak = (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || matchMedia("(prefers-reduced-motion: reduce)").matches;
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, weak ? 1 : 1.25));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+      camera.position.set(0, 0.4, 12.5);
+      camera.lookAt(0, 0, 0);
+
+      function fit() {
+        const w = document.documentElement.clientWidth || innerWidth || 1280;
+        const h = document.documentElement.clientHeight || innerHeight || 720;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      fit();
+      if (window.ResizeObserver) new ResizeObserver(fit).observe(document.body);
+      addEventListener("resize", fit);
+
+      /* ---------- environment (soft studio gloss) ---------- */
+      const envC = document.createElement("canvas");
+      envC.width = 512; envC.height = 256;
+      const ex = envC.getContext("2d");
+      const grd = ex.createLinearGradient(0, 0, 0, 256);
+      grd.addColorStop(0, "#ffffff");
+      grd.addColorStop(0.5, "#d7e7f4");
+      grd.addColorStop(0.75, "#88b4d6");
+      grd.addColorStop(1, "#243a56");
+      ex.fillStyle = grd; ex.fillRect(0, 0, 512, 256);
+      ex.fillStyle = "rgba(255,255,255,0.7)";
+      ex.beginPath(); ex.arc(130, 60, 34, 0, 7); ex.fill();
+      ex.beginPath(); ex.arc(360, 70, 42, 0, 7); ex.fill();
+      const envTex = new THREE.CanvasTexture(envC);
+      envTex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envRT = pmrem.fromEquirectangular(envTex);
+      scene.environment = envRT.texture;
+      envTex.dispose(); pmrem.dispose();
+
+      /* ---------- lighting ---------- */
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x2a3550, 0.55));
+      const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(6, 11, 8); scene.add(key);
+      const fill = new THREE.DirectionalLight(0xdbe9ff, 0.3); fill.position.set(-6, 4, -3); scene.add(fill);
+      const rim = new THREE.DirectionalLight(0xbfe0ff, 0.28); rim.position.set(0, 3, -8); scene.add(rim);
+
+      /* ---------- helpers ---------- */
+      function toTex(c) {
+        const t = new THREE.CanvasTexture(c);
+        t.encoding = THREE.sRGBEncoding;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }
+      // draw the (white-alpha) logo re-tinted to any solid colour
+      function drawTintedLogo(x, lg, dx, dy, w, h, color) {
+        const tc = document.createElement("canvas");
+        tc.width = Math.max(1, Math.round(w)); tc.height = Math.max(1, Math.round(h));
+        const tx = tc.getContext("2d");
+        tx.drawImage(lg, 0, 0, tc.width, tc.height);
+        tx.globalCompositeOperation = "source-in";
+        tx.fillStyle = color; tx.fillRect(0, 0, tc.width, tc.height);
+        x.drawImage(tc, dx, dy, w, h);
+      }
+      // rounded-rectangle path with a pronounced curved TOP (bigger radius on the top corners)
+      function plaquePath(x, L, Tp, R, B, rTopC, rBot) {
+        x.beginPath();
+        x.moveTo(L, B - rBot);
+        x.lineTo(L, Tp + rTopC);
+        x.quadraticCurveTo(L, Tp, L + rTopC, Tp);
+        x.lineTo(R - rTopC, Tp);
+        x.quadraticCurveTo(R, Tp, R, Tp + rTopC);
+        x.lineTo(R, B - rBot);
+        x.quadraticCurveTo(R, B, R - rBot, B);
+        x.lineTo(L + rBot, B);
+        x.quadraticCurveTo(L, B, L, B - rBot);
+        x.closePath();
+      }
+      function brandStripTex(wPx, hPx) {
+        const c = document.createElement("canvas"); c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = NAVY; x.fillRect(0, 0, wPx, hPx);           // navy plaque
+        // perimeter outline in the stand's own navy (a shade lighter): hugs the edges,
+        // curved on the TOP corners only, square across the bottom
+        const m = hPx * 0.045;                                    // hug the very edge of the curved lip
+        plaquePath(x, m, m, wPx - m, hPx - m, hPx * 0.46, 0);     // top radius ≈ edge radius − margin (concentric), square bottom
+        x.lineWidth = hPx * 0.04;
+        x.strokeStyle = "#5a7cb5";                                // lighter navy — reads clearly against the dark plaque
+        x.stroke();
+        const lg = logoWhite || logoColored;
+        if (lg) {
+          const ratio = lg.naturalHeight / lg.naturalWidth;
+          const h = Math.round(hPx * 0.5), w = Math.round(h / ratio);
+          drawTintedLogo(x, lg, (wPx - w) / 2, (hPx - h) / 2, w, h, SKY);
+        }
+        return toTex(c);
+      }
+      function signTex(wPx, hPx) {
+        const c = document.createElement("canvas"); c.width = wPx; c.height = hPx;
+        const x = c.getContext("2d");
+        x.fillStyle = NAVY; x.fillRect(0, 0, wPx, hPx);
+        x.fillStyle = SKY; x.fillRect(0, hPx * 0.90, wPx, hPx * 0.05);   // thin sky accent line
+        const lg = logoWhite || logoColored;
+        if (lg) {
+          const ratio = lg.naturalHeight / lg.naturalWidth;
+          // fill ~92% of the width, but cap the height so it never overflows (no distortion)
+          let w = wPx * 0.92, h = w * ratio;
+          const maxH = hPx * 0.80;
+          if (h > maxH) { h = maxH; w = h / ratio; }
+          drawTintedLogo(x, lg, (wPx - w) / 2, hPx * 0.44 - h / 2, w, h, SKY);
+        }
+        return toTex(c);
+      }
+
+      // a rectangle (origin bottom-centre) with rounded TOP corners
+      function roundTopShape(w, h, r) {
+        const s = new THREE.Shape();
+        s.moveTo(-w / 2, 0);
+        s.lineTo(w / 2, 0);
+        s.lineTo(w / 2, h - r);
+        s.quadraticCurveTo(w / 2, h, w / 2 - r, h);
+        s.lineTo(-w / 2 + r, h);
+        s.quadraticCurveTo(-w / 2, h, -w / 2, h - r);
+        s.closePath();
+        return s;
+      }
+      function normUV(geo, w, h) {   // map extrude-cap UVs to 0..1 so the logo sits right
+        const uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) + w / 2) / w, uv.getY(i) / h);
+        uv.needsUpdate = true;
+      }
+
+      /* ---------- materials ---------- */
+      const matNavy = new THREE.MeshStandardMaterial({ color: NAVY, roughness: 0.55, metalness: 0.12 });
+      const matNavyD = new THREE.MeshStandardMaterial({ color: NAVY_D, roughness: 0.6, metalness: 0.1 });
+      const matNavy2 = new THREE.MeshStandardMaterial({ color: NAVY2, roughness: 0.6, metalness: 0.1 });
+      const matSky = new THREE.MeshStandardMaterial({ color: SKY, roughness: 0.5, metalness: 0.15 });
+      // interior surfaces (tray floor + back liner): a lighter navy for subtle depth — NOT white, so nothing pale shows from the front
+      const matLight = new THREE.MeshStandardMaterial({ color: "#2b4c7d", roughness: 0.7, metalness: 0.04, side: THREE.DoubleSide });
+      const fasciaMat = new THREE.MeshStandardMaterial({ map: brandStripTex(1024, 146), roughness: 0.5, metalness: 0.12 });
+      const signMat = new THREE.MeshStandardMaterial({ map: signTex(1024, 326), roughness: 0.5, metalness: 0.12 });
+      // face order [+x,-x,+y,-y,+z,-z]; +z (index 4) = FRONT
+      const fasciaFaces = [matNavy, matNavy, matNavy, matNavy, fasciaMat, matNavy];
+      const signFaces = [matNavy, matNavy, matNavy, matNavy, signMat, matNavy];
+
+      /* ---------- dimensions ---------- */
+      const T = 0.0175, Wx = 2.4, Dz = 1.15;   // panel thickness = quarter of the old 0.07 (thin cardboard)
+      const plinthTop = 0.06;                                        // NO base — bottom shelf is the lowest element
+      const cellH = 0.82, N = 5, fasciaH = 0.34;
+      const rTop = 0.16;                                             // top-corner radius (curved top)
+      const topDivY = plinthTop + N * cellH;                         // 4.72
+      const headerH = 0.72;                                          // just the logo band
+      const Hy = topDivY + headerH;                                  // top of the stand
+      const innerW = Wx - 2 * T;
+      const trayY = (i) => plinthTop + i * cellH;
+
+      const stand = new THREE.Group();
+      function addBox(w, h, d, mat, x, y, z, parent) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        m.position.set(x, y, z); (parent || stand).add(m); return m;
+      }
+
+      /* ---------- carcass ---------- */
+      const backGeo = new THREE.ExtrudeGeometry(roundTopShape(Wx, Hy, rTop), { depth: T, bevelEnabled: false });
+      const backPanel = new THREE.Mesh(backGeo, matNavy);
+      backPanel.position.set(0, 0, -Dz / 2); stand.add(backPanel);            // back panel, curved top
+      addBox(innerW - 0.02, topDivY - plinthTop, 0.02, matLight,             // back inner liner (depth pop)
+             0, (plinthTop + topDivY) / 2, -Dz / 2 + T + 0.015);
+      // SLANTED side walls: the front edge follows the shelf staircase — deep at
+      // the base, stepping back up to the shallow logo header (a wedge profile).
+      // subtle "mozaik" mosaic tiling for the side panels (fills the empty area, on-brand)
+      function mosaicTex() {
+        const N = 8, cell = 32, S = N * cell;
+        const c = document.createElement("canvas"); c.width = S; c.height = S;
+        const x = c.getContext("2d");
+        x.fillStyle = NAVY; x.fillRect(0, 0, S, S);                   // base = panel navy
+        x.globalAlpha = 0.28;                                        // pattern very faint (subtle texture only)
+        x.fillStyle = NAVY_D; x.fillRect(0, 0, S, S);                 // grout
+        const pal = ["#1b3358", "#213b64", "#182d52", "#24406e", "#1f3a66", "#26456f"];
+        const g = 3;
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          let col = pal[(i * 3 + j * 5 + ((i * j) % 4)) % pal.length];
+          if (((i + j * 2) % 11) === 0) col = "#356ea0";             // occasional faint sky tile
+          x.fillStyle = col;
+          x.fillRect(i * cell + g, j * cell + g, cell - 2 * g, cell - 2 * g);
+        }
+        x.globalAlpha = 1;
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(1 / 1.4, 1 / 1.4);                              // ~0.175 m tiles (uv is in world metres)
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        t.encoding = THREE.sRGBEncoding;
+        return t;
+      }
+      const matSide = new THREE.MeshStandardMaterial({ color: 0xffffff, map: mosaicTex(), roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide });
+      const zBackW = -Dz / 2, fDeep = 0.5;
+      const sideShape = new THREE.Shape();
+      sideShape.moveTo(zBackW, 0);
+      sideShape.lineTo(fDeep, 0);              // deep bottom-front
+      sideShape.lineTo(zBackW, Hy - rTop);     // ONE straight cut line all the way up (no bend / no kink)
+      sideShape.closePath();                   // vertical back edge
+      const sideGeo = new THREE.ExtrudeGeometry(sideShape, { depth: T, bevelEnabled: false });
+      sideGeo.rotateY(-Math.PI / 2);           // profile → world Z, thickness → world X (-T..0)
+      const sideL = new THREE.Mesh(sideGeo, matSide); sideL.position.x = -Wx / 2 + T; stand.add(sideL);
+      const sideR = new THREE.Mesh(sideGeo, matSide); sideR.position.x = Wx / 2; stand.add(sideR);
+
+      /* ---------- side panels carry only the subtle mosaic (no logo) ---------- */
+
+      // (no base plinth / toe-kick — the bottom shelf sits at the bottom)
+
+      /* ---------- 5 shelf TRAYS (tilted, with lips) ---------- */
+      function makeTray(td) {
+        const g = new THREE.Group();
+        addBox(innerW, T, td, matNavy2, 0, -T / 2, 0, g);                     // tray board
+        const top = new THREE.Mesh(new THREE.PlaneGeometry(innerW - 0.03, td - 0.11), matLight);
+        top.rotation.x = -Math.PI / 2; top.position.set(0, 0.008, -0.03); g.add(top);  // inner tray floor: raised to clear the board top, front edge pulled well behind the fascia lip so the tilt can't expose it
+        // branded front lip: a plate whose TOP is curved (matches the drawn outline), square bottom
+        const fGeo = new THREE.ExtrudeGeometry(roundTopShape(innerW, fasciaH, fasciaH * 0.5), { depth: T, bevelEnabled: false });
+        normUV(fGeo, innerW, fasciaH);
+        const fascia = new THREE.Mesh(fGeo, [fasciaMat, matNavy]);
+        fascia.position.set(0, -0.03, td / 2 - T); g.add(fascia);   // bottom at y=-0.03, front cap at z = td/2
+        addBox(innerW, 0.13, T, matNavy2, 0, 0.065, -td / 2 + T / 2, g);      // back lip
+        addBox(T, 0.15, td, matNavy2, -innerW / 2 + T / 2, 0.075, 0, g);      // left lip
+        addBox(T, 0.15, td, matNavy2, innerW / 2 - T / 2, 0.075, 0, g);       // right lip
+        return g;
+      }
+      /* ---------- illustrative products (semi-transparent) — "the stand fits anything" ---------- */
+      // cache materials & geometries so repeated products reuse them (fewer GPU resources / state changes)
+      const _pMat = {}, _pGeo = {};
+      function pMat(hex, op) { const k = hex + "|" + (op || 0.45); return _pMat[k] || (_pMat[k] = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.35, metalness: 0.05, transparent: true, opacity: op || 0.45, depthWrite: false })); }
+      function pBox(w, h, d, mat) { const k = "b" + w + "_" + h + "_" + d; return new THREE.Mesh(_pGeo[k] || (_pGeo[k] = new THREE.BoxGeometry(w, h, d)), mat); }
+      function pCyl(rt, rb, h, mat) { const k = "c" + rt + "_" + rb + "_" + h; return new THREE.Mesh(_pGeo[k] || (_pGeo[k] = new THREE.CylinderGeometry(rt, rb, h, 14)), mat); }
+      function pSphere(mat) { return new THREE.Mesh(_pGeo.sph || (_pGeo.sph = new THREE.SphereGeometry(0.5, 12, 8)), mat); }
+      function roundedRectShape(w, h, r) {
+        const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+        s.moveTo(x + r, y);
+        s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+        s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+        s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+        return s;
+      }
+      const pick = a => a[(Math.random() * a.length) | 0];
+
+      // heights are exaggerated so the tops clear the ~0.31 branded front lip and stay visible
+      function chipsBag() {                                   // flat foil pouch: puffy body (flat face) + wide crimped seals
+        const g = new THREE.Group(); const m = pMat(pick([0xd94b3b, 0xe0a11a, 0x3fa34d, 0x2f7fd0, 0xd93b7a]), 0.55);
+        const bodyGeo = _pGeo.bag || (_pGeo.bag = (function () {
+          const geo = new THREE.ExtrudeGeometry(roundedRectShape(0.16, 0.26, 0.05),
+            { depth: 0.10, bevelEnabled: true, bevelThickness: 0.065, bevelSize: 0.045, bevelSegments: 3, steps: 1 });
+          geo.center(); return geo;                          // flat front panel, but a thick puffed/inflated body (~0.23 deep)
+        })());
+        const body = new THREE.Mesh(bodyGeo, m); body.position.y = 0.205;
+        const seal = pMat(0xefefef, 0.4);
+        const topSeal = pBox(0.245, 0.05, 0.02, seal); topSeal.position.y = 0.385;            // wide crimped top fin
+        const botSeal = pBox(0.245, 0.05, 0.02, seal); botSeal.position.y = 0.03;             // wide crimped bottom fin
+        g.add(body, topSeal, botSeal); return g;
+      }
+      function jar() {                                        // cosmetic container: tall body + lid
+        const g = new THREE.Group(); const c = pick([0xe6a6c7, 0xcfa2e0, 0xf0d0b0, 0xa9d3c8]);
+        const body = pCyl(0.085, 0.085, 0.30, pMat(c, 0.42)); body.position.y = 0.15;
+        const lid = pCyl(0.092, 0.092, 0.06, pMat(0xf3e8dd, 0.55)); lid.position.y = 0.33;
+        g.add(body, lid); return g;
+      }
+      function lipstick() {                                   // slim tall tube + bullet
+        const g = new THREE.Group();
+        const tube = pCyl(0.03, 0.034, 0.26, pMat(pick([0x8b5a2b, 0x2b2b40, 0xb08d57]), 0.5)); tube.position.y = 0.13;
+        const bullet = pCyl(0.02, 0.028, 0.08, pMat(pick([0xd23a5e, 0xb51e3a, 0xe06a8a]), 0.65)); bullet.position.y = 0.30;
+        g.add(tube, bullet); return g;
+      }
+      function perfumeBox() {                                 // tall elegant box
+        const g = new THREE.Group(); const c = pick([0x243b6b, 0x6b2340, 0x243f2b, 0x3a2a5a, 0x1f1f2b]);
+        const b = pBox(0.16, 0.40, 0.16, pMat(c, 0.5)); b.position.y = 0.20;
+        g.add(b); return g;
+      }
+      function perfumeBottle() {                              // flacon: body + neck + cap
+        const g = new THREE.Group(); const c = pick([0x7fb4d9, 0xd9b37f, 0xd97fae, 0x9ad9b0]);
+        const body = pBox(0.13, 0.26, 0.07, pMat(c, 0.4)); body.position.y = 0.13;
+        const neck = pBox(0.04, 0.06, 0.04, pMat(c, 0.45)); neck.position.y = 0.29;
+        const cap = pBox(0.05, 0.06, 0.05, pMat(0x2b2b40, 0.6)); cap.position.y = 0.35;
+        g.add(body, neck, cap); return g;
+      }
+
+      function populate(tray, builder, count) {
+        const usableW = innerW - 0.2, step = usableW / count;
+        for (let k = 0; k < count; k++) {
+          const p = builder();
+          p.position.set(-usableW / 2 + step * (k + 0.5), 0.014, -0.02);
+          tray.add(p);
+        }
+      }
+      const shelfPlan = [                                     // bottom → top
+        { make: chipsBag, n: 6 },
+        { make: jar, n: 8 },
+        { make: lipstick, n: 11 },
+        { make: perfumeBox, n: 7 },
+        { make: perfumeBottle, n: 7 },
+      ];
+
+      // STAIRCASE: the bottom tray is the deepest (juts out most); each one up
+      // is a little shallower, its front stepping back — like stairs.
+      const zBack = -Dz / 2 + T;
+      const tdBottom = 1.05, tdStep = 0.13;
+      for (let i = 0; i < N; i++) {
+        const td = tdBottom - i * tdStep;
+        const t = makeTray(td);
+        t.position.set(0, trayY(i), zBack + td / 2);   // back stays put → front steps back going up
+        t.rotation.x = 0.06;                           // gentle forward tilt
+        const plan = shelfPlan[i]; if (plan) populate(t, plan.make, plan.n);
+        stand.add(t);
+      }
+
+      /* ---------- header: Mozaik logo, flat on the back wall, curved top corners ---------- */
+      const signGeo = new THREE.ExtrudeGeometry(roundTopShape(innerW, headerH, 0.12), { depth: 0.02, bevelEnabled: false });
+      normUV(signGeo, innerW, headerH);
+      const sign = new THREE.Mesh(signGeo, [signMat, matNavy]);
+      sign.position.set(0, topDivY, -Dz / 2 + T + 0.011); stand.add(sign);
+
+      /* ---------- centre + rotate group ---------- */
+      stand.position.y = -Hy / 2;
+      const root = new THREE.Group();
+      root.add(stand);
+      scene.add(root);
+
+      /* ---------- soft contact shadow ---------- */
+      const shC = document.createElement("canvas"); shC.width = shC.height = 256;
+      const sx = shC.getContext("2d");
+      const rg = sx.createRadialGradient(128, 128, 10, 128, 128, 128);
+      rg.addColorStop(0, "rgba(0,0,0,0.42)"); rg.addColorStop(1, "rgba(0,0,0,0)");
+      sx.fillStyle = rg; sx.fillRect(0, 0, 256, 256);
+      const shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(Wx * 2.2, Dz * 3.4),
+        new THREE.MeshBasicMaterial({ map: toTex(shC), transparent: true, depthWrite: false })
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = -Hy / 2 + 0.005;
+      root.add(shadow);
+
+      /* ---------- drag / zoom / auto-rotate ---------- */
+      let dragging = false, pxm = 0, pym = 0;
+      const rot = { x: 0.06, y: -0.4 };
+      root.rotation.set(rot.x, rot.y, 0);
+
+      function zoom(f) {
+        camera.position.multiplyScalar(f);
+        const d = camera.position.length();
+        if (d < 7) camera.position.setLength(7);
+        if (d > 24) camera.position.setLength(24);
+      }
+      function down(cx, cy) { dragging = true; pxm = cx; pym = cy; document.body.classList.add("grabbing"); resetIdle(); }
+      function move(cx, cy) {
+        if (!dragging) return;
+        rot.y += (cx - pxm) * 0.01;
+        rot.x += (cy - pym) * 0.01;
+        rot.x = Math.max(-0.9, Math.min(0.9, rot.x));
+        root.rotation.set(rot.x, rot.y, 0);
+        pxm = cx; pym = cy;
+      }
+      function up() { dragging = false; document.body.classList.remove("grabbing"); }
+      addEventListener("mousedown", e => down(e.clientX, e.clientY));
+      addEventListener("mousemove", e => move(e.clientX, e.clientY));
+      addEventListener("mouseup", up);
+
+      let pinch = 0;
+      const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      addEventListener("touchstart", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) { dragging = false; pinch = dist(e.touches[0], e.touches[1]); resetIdle(); }
+        else if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+      addEventListener("touchmove", e => {
+        e.preventDefault();
+        if (e.touches.length === 2) {
+          const d = dist(e.touches[0], e.touches[1]);
+          if (pinch > 0) zoom(1 + (pinch - d) * 0.004);
+          pinch = d; resetIdle();
+        } else if (e.touches[0]) move(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+      addEventListener("touchend", e => { if (e.touches.length < 2) pinch = 0; if (e.touches.length === 0) up(); }, { passive: false });
+      addEventListener("wheel", e => { e.preventDefault(); zoom(1 + e.deltaY * 0.0009); }, { passive: false });
+
+      let autoOn = false, idle = null;
+      function resetIdle() { autoOn = false; clearTimeout(idle); idle = setTimeout(() => { autoOn = true; }, 3500); }
+      resetIdle();
+
+      addEventListener("message", function (e) { if (e.data === "mzk:pause") window.__mzkPaused = true; else if (e.data === "mzk:resume") window.__mzkPaused = false; });
+      document.addEventListener("visibilitychange", function () { window.__mzkPaused = document.hidden; });
+      // stop the render loop entirely while the stand is scrolled out of view (big saving inside a page)
+      if (window.IntersectionObserver) {
+        new IntersectionObserver(function (es) { window.__mzkOffscreen = !es[0].isIntersecting; }, { threshold: 0 })
+          .observe(renderer.domElement);
+      }
+      (function loop() {
+        requestAnimationFrame(loop);
+        if (window.__mzkPaused || window.__mzkOffscreen) return;
+        if (autoOn && !dragging) { rot.y += 0.0035; root.rotation.y = rot.y; }
+        renderer.render(scene, camera);
+      })();
+
+      window.__debug = { THREE, root, stand, camera, scene, renderer };
+      console.log("✓ Mozaik 5-shelf stand (no bottles) ready");
+    }
+  </script>
+</body>
+</html>
