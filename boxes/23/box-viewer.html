@@ -211,7 +211,7 @@
       // ---- navy body: a HOLLOW tube (open top) + a bottom cap, so the white
       //      interior shows when the lid lifts. Envmap kept low → deep navy. ----
       const TWALL = 0.02;    // thin cardboard wall
-      const bodyMat = new THREE.MeshBasicMaterial({ color: WHITE });
+      const bodyMat = new THREE.MeshBasicMaterial({ color: SKY });
       const body = new THREE.Mesh(roundedTubeGeo(W, H, D, R, BEV, TWALL), bodyMat);
       carton.add(body);
       const baseCap = new THREE.Mesh(roundedBoxGeo(W - 0.01, TWALL, D - 0.01, R, BEV * 0.5), bodyMat);
@@ -219,10 +219,10 @@
       carton.add(baseCap);
 
       // ---- printed decal panels on all four walls + bottom ----
-      // WHITE background on every (square) face; keep the sky-blue frame + coloured logo
-      const frontTex = panelTexture(620, 1400, WHITE, NAVY, false, 0.7);
-      const backTex = panelTexture(620, 1400, WHITE, NAVY, false, 0.7);
-      const sideTex = panelTexture(620, 1400, WHITE, NAVY, false, 0.7);   // sides now equal the big faces
+      // SKY (light-blue) background on every (square) face; keep the navy frame + coloured logo
+      const frontTex = panelTexture(620, 1400, SKY, NAVY, false, 0.7);
+      const backTex = panelTexture(620, 1400, SKY, NAVY, false, 0.7);
+      const sideTex = panelTexture(620, 1400, SKY, NAVY, false, 0.7);   // sides now equal the big faces
       const bottomTex = panelTexture(700, 700, NAVY, WHITE, true, 0.62);  // navy base, white logo (matches the top)
 
       function decal(tex, w, h) {
@@ -273,6 +273,7 @@
       // every closure part is plain WHITE board — top face, underside, edges, no exception
       const whiteBoard = new THREE.MeshBasicMaterial({ color: WHITE, side: THREE.DoubleSide });
       const navyBoard = new THREE.MeshBasicMaterial({ color: NAVY, side: THREE.DoubleSide });
+      const skyBoard = new THREE.MeshBasicMaterial({ color: SKY, side: THREE.DoubleSide });   // light-blue exterior (tongue + ears)
       const lidT = TWALL;                          // same thin cardboard as every other panel
       const lid = new THREE.Mesh(roundedBoxGeo(2 * EX - 2 * lidBev, lidT, 2 * EZ - 2 * lidBev, R, lidBev), whiteBoard);
       lid.position.set(0, lidT / 2, EZ);           // back edge sits exactly on the hinge — no overhang, no gap
@@ -296,7 +297,7 @@
       // crease angle in applyFold swings it from trailing (open) to tucked-down (closed)
       const tuck = new THREE.Mesh(
         roundedBoxGeo(2 * pmX, TWALL, 0.40, 0.02, 0.006),
-        navyBoard
+        skyBoard
       );
       tuck.position.set(0, 0, 0.20);
       tuckPivot.add(tuck);
@@ -308,7 +309,7 @@
       const earLen = innerHalfX * 0.96 + earOv;
       const earDepth = 2 * innerHalfZ;              // full depth → no gaps at the ends
       const earGeo = roundedBoxGeo(earLen, TWALL, earDepth, 0.01, 0.006);
-      const earMat = whiteBoard;
+      const earMat = skyBoard;
       const earL = new THREE.Group();
       earL.position.set(-innerHalfX, EY, 0); carton.add(earL);
       const earLm = new THREE.Mesh(earGeo, earMat); earLm.position.set(earLen / 2 - earOv, 0, 0); earL.add(earLm);
