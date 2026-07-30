@@ -39,6 +39,7 @@
       renderer.shadowMap.enabled = false;   // ground shadow removed (perf: no shadow-map pass)
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.localClippingEnabled = true;   // lets us hide any base part poking outside the walls
       document.body.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
@@ -196,6 +197,11 @@
           x.drawImage(t, -lw / 2, -lh / 2);
           x.restore();
         }
+        // white "paint" down both vertical edges → the box corners read as white
+        const bw = panelWpx * 0.03;
+        x.fillStyle = WHITE;
+        x.fillRect(0, 0, bw, panelHpx);
+        x.fillRect(panelWpx - bw, 0, bw, panelHpx);
         paperGrain(x, panelWpx, panelHpx, 0.3);
         return toTexture(c);
       }
@@ -264,7 +270,7 @@
            · slider: unlocks the base — main flaps swing down and
              apart, then the tuck triangles fold out after them
          ========================================================= */
-      const W = 1.9, D = 1.9, H = 2.35, T = 0.012;
+      const W = 1.9, D = 1.9, H = 2.35, T = 0.004;   // thin board → no thickness gaps/overlap at corners
       const NOTCH = 0.13;                     // half-width of the center diamond notch
 
       const trayGroup = new THREE.Group();
@@ -275,19 +281,33 @@
       const lidLogoTex  = navyLogoTexture(1024, 1024, 0.5, true);    // same, pre-rotated 180° for the top lid
       const frontTex = logoPanelTexture(1024, 1024, 0.52);
       const backTex  = logoPanelTexture(1024, 1024, 0.52);
+      // WHITE lid face carrying the full COLOURED logo, pre-rotated 180° for the lid frame
+      const lidColorTex = (function (px, frac) {
+        const c = document.createElement("canvas"); c.width = c.height = px;
+        const x = c.getContext("2d");
+        x.fillStyle = WHITE; x.fillRect(0, 0, px, px);
+        if (logo) {
+          const ratio = logo.naturalHeight / logo.naturalWidth;
+          const lw = Math.round(px * frac), lh = Math.round(lw * ratio);
+          x.save(); x.translate(px / 2, px / 2); x.rotate(Math.PI);
+          x.drawImage(logo, -lw / 2, -lh / 2, lw, lh); x.restore();
+        }
+        paperGrain(x, px, px, 0.4);
+        return toTexture(c);
+      })(1024, 0.5);
 
       /* ---------- 4 walls: white front/back with logo, navy sides ---------- */
       const plainW = () => cardMat(whiteTex);
       const navyP  = () => cardMat(navyTex);   // plain navy (interior & non-logo faces)
       const frontWall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), [
-        plainW(), plainW(), plainW(), plainW(), cardMat(frontTex), plainW()
+        navyP(), navyP(), navyP(), navyP(), cardMat(navyLogoTex), plainW()   // +z exterior=navy+logo+edges, -z interior=white
       ]);
       frontWall.position.set(0, H / 2, D / 2 - T / 2);
       frontWall.castShadow = frontWall.receiveShadow = true;
       trayGroup.add(frontWall);
 
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), [
-        plainW(), plainW(), plainW(), plainW(), plainW(), cardMat(backTex)
+        navyP(), navyP(), navyP(), navyP(), plainW(), cardMat(navyLogoTex)   // -z exterior=navy+logo+edges, +z interior=white
       ]);
       backWall.position.set(0, H / 2, -D / 2 + T / 2);
       backWall.castShadow = backWall.receiveShadow = true;
@@ -296,14 +316,14 @@
       // logo ONLY on the outer face; interior stays plain navy.
       // BoxGeometry material order: [ +x, -x, +y, -y, +z, -z ]
       const leftWall = new THREE.Mesh(new THREE.BoxGeometry(T, H, D), [
-        navyP(), cardMat(navyLogoTex), navyP(), navyP(), navyP(), navyP()   // outer = -x
+        plainW(), cardMat(navyLogoTex), navyP(), navyP(), navyP(), navyP()   // -x exterior=navy+logo, +x interior=white
       ]);
       leftWall.position.set(-W / 2 + T / 2, H / 2, 0);
       leftWall.castShadow = leftWall.receiveShadow = true;
       trayGroup.add(leftWall);
 
       const rightWall = new THREE.Mesh(new THREE.BoxGeometry(T, H, D), [
-        cardMat(navyLogoTex), navyP(), navyP(), navyP(), navyP(), navyP()   // outer = +x
+        cardMat(navyLogoTex), plainW(), navyP(), navyP(), navyP(), navyP()   // +x exterior=navy+logo, -x interior=white
       ]);
       rightWall.position.set(W / 2 - T / 2, H / 2, 0);
       rightWall.castShadow = rightWall.receiveShadow = true;
@@ -359,7 +379,7 @@
         const shape = new THREE.Shape();
         shape.moveTo(-D / 2, 0);
         shape.lineTo(D / 2, 0);
-        shape.lineTo(0, W * 0.66);
+        shape.lineTo(0, W * 0.5);
         shape.closePath();
         const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false }));
         geo.rotateX(-Math.PI / 2);
@@ -404,14 +424,14 @@
       const lidGeo = new THREE.BoxGeometry(W, T, D);
       lidGeo.translate(0, T / 2, -D / 2);
       const topLidFlap = makeFlap(lidGeo, [
-        navyP(), navyP(), cardMat(lidLogoTex), navyP(), navyP(), navyP()   // logo only on +y (top)
+        plainW(), plainW(), cardMat(lidColorTex), plainW(), plainW(), plainW()   // WHITE lid, coloured logo on +y (top)
       ], Math.PI, new THREE.Vector3(0, H - T, -D / 2));
 
       // tuck flap on the lid's far edge: a small strip permanently folded
       // ~90° down that slips INSIDE the box behind the front wall when the
       // lid closes — the lock that secures the top closure. It's a child of
       // the lid hinge, so it travels with the lid when it swings open
-      const lidTuck = new THREE.Mesh(rectFlapGeometry(W - 0.05, 0.2), cardMat(navyTex));
+      const lidTuck = new THREE.Mesh(rectFlapGeometry(W - 0.05, 0.2), cardMat(whiteTex));
       lidTuck.rotation.x = -Math.PI / 2 * 1.06;      // folded down, tipped slightly INWARD
       lidTuck.position.set(0, 0, -(D - T));          // hinge right AT the lid's far edge
       lidTuck.castShadow = lidTuck.receiveShadow = true;
@@ -421,12 +441,81 @@
       const topSideR = makeFlap(rectFlapGeometry(D - 0.02, W * 0.38), cardMat(whiteTex), Math.PI / 2,
         new THREE.Vector3(W / 2, H - T - 0.013, 0));
 
+      /* ---------- COLLAPSE RIG: CONNECTED hinge chain (rigid parallelogram) ----------
+         The four walls are PARENTED IN A CHAIN (back → left → front → right) so their
+         corners are physically joined and can NEVER separate or swap — the tube folds
+         flat as ONE rigid piece. Angles (α, −α, α) keep front parallel to back and land
+         the right wall's free edge exactly on the fixed BR corner. Each wall carries its
+         own flaps; .attach() preserves the authored erect pose. */
+      trayGroup.updateMatrixWorld(true);
+      const leftPivot = new THREE.Group();
+      leftPivot.position.set(-W / 2, 0, -D / 2);       // hinge at back-left corner (BL)
+      trayGroup.add(leftPivot);
+      leftPivot.attach(leftWall);
+      leftPivot.attach(topSideL.parent);
+      leftPivot.attach(leftTri.parent);
+
+      const frontPivot = new THREE.Group();
+      frontPivot.position.set(-W / 2, 0, D / 2);       // hinge at front-left corner (FL)
+      leftPivot.attach(frontPivot);
+      frontPivot.attach(frontWall);
+      frontPivot.attach(frontFlap.parent);
+
+      const rightPivot = new THREE.Group();
+      rightPivot.position.set(W / 2, 0, D / 2);        // hinge at front-right corner (FR)
+      frontPivot.attach(rightPivot);
+      rightPivot.attach(rightWall);
+      rightPivot.attach(topSideR.parent);
+      rightPivot.attach(rightTri.parent);
+      // backWall + backFlap stay in trayGroup as the fixed reference edge (BL–BR)
+      const leftWallX0 = leftWall.position.x, rightWallX0 = rightWall.position.x;
+
       scene.add(trayGroup);
       trayGroup.position.y = -1.12;
 
       const boxGroup = new THREE.Group();
       boxGroup.add(trayGroup);
       scene.add(boxGroup);
+
+      /* ---------- BASE CLIPPING ----------
+         Any base part poking THROUGH a wall to the OUTSIDE is hidden; the inside stays.
+         Four world-space planes are re-derived from the walls each frame (follow the box
+         as it rotates AND folds). The NAVY wide flaps get two extra planes (one per white
+         triangle) so navy never pokes up through a triangle. Walls are never clipped. */
+      const baseFlaps = [frontFlap, backFlap, leftTri, rightTri];
+      const clipPlanes = [new THREE.Plane(), new THREE.Plane(), new THREE.Plane(), new THREE.Plane()];
+      const _clipWalls = [
+        { mesh: rightWall, n: new THREE.Vector3(-1, 0, 0) },
+        { mesh: leftWall,  n: new THREE.Vector3( 1, 0, 0) },
+        { mesh: frontWall, n: new THREE.Vector3( 0, 0, -1) },
+        { mesh: backWall,  n: new THREE.Vector3( 0, 0,  1) }
+      ];
+      baseFlaps.forEach(hinge => hinge.children.forEach(c => {
+        if (c.isMesh && c.material) { c.material.clippingPlanes = clipPlanes; c.material.clipShadows = true; }
+      }));
+      const triPlanes = [new THREE.Plane(), new THREE.Plane()];
+      const navyClip = clipPlanes.concat(triPlanes);
+      [frontFlap, backFlap].forEach(hinge => hinge.children.forEach(c => {
+        if (c.isMesh && c.material) c.material.clippingPlanes = navyClip;
+      }));
+      const _triFlaps = [leftTri, rightTri];
+      const _cq = new THREE.Quaternion(), _cp = new THREE.Vector3(), _cn = new THREE.Vector3();
+      function updateClips() {
+        _clipWalls.forEach((w, i) => {
+          w.mesh.getWorldQuaternion(_cq);
+          w.mesh.getWorldPosition(_cp);
+          _cn.copy(w.n).applyQuaternion(_cq).normalize();
+          clipPlanes[i].setFromNormalAndCoplanarPoint(_cn, _cp);
+        });
+        _triFlaps.forEach((f, i) => {
+          const mesh = f.children.find(c => c.isMesh);
+          if (!mesh) return;
+          mesh.getWorldQuaternion(_cq);
+          mesh.getWorldPosition(_cp);
+          _cn.set(0, -1, 0).applyQuaternion(_cq).normalize();   // keep navy BELOW the triangle
+          triPlanes[i].setFromNormalAndCoplanarPoint(_cn, _cp);
+        });
+      }
 
       /* ---------- soft ground shadow ---------- */
       const shadowCatcher = new THREE.Mesh(
@@ -445,21 +534,31 @@
                      the tuck triangles fold out after them) */
       let foldTarget = 1, fold = 1;
       function applyFold(t) {
-        const topOpen  = Math.min(1, Math.max(0, (1 - t)));   // full slider drives the TOP only
-        const baseOpen = 0;                                    // crash-lock BASE stays fixed (bottom never unlocks)
-
+        /* ---- TOP: slider upper half 1→0.5 opens the lid ---- */
+        const topOpen  = Math.min(1, Math.max(0, (1 - t) * 2));
         const topMainT = Math.min(1, topOpen * 1.6);
         const topSideT = Math.max(0, (topOpen - 0.375) / 0.625);
         topLidFlap.rotation.x = 1.95 * topMainT;  // the long main lid swings up & back
         topSideL.rotation.x = 1.65 * topSideT;
         topSideR.rotation.x = 1.65 * topSideT;
 
-        const mainT = Math.min(1, baseOpen * 1.5);
-        const triT = Math.max(0, (baseOpen - 0.33) / 0.67);
-        frontFlap.rotation.x = -1.75 * mainT;      // down and apart
-        backFlap.rotation.x = -1.75 * mainT;
-        leftTri.rotation.x = -1.55 * triT;
-        rightTri.rotation.x = -1.55 * triT;
+        /* ---- FLAT-COLLAPSE: slider lower half 0.5→0 — CONNECTED chain ----
+           angles (α, −α, α) fold the tube as one rigid piece; α capped ~76° so the
+           flat pack never becomes exactly coplanar (max flatten limit). */
+        const bOpen = Math.min(1, Math.max(0, (0.5 - t) / 0.5));
+        const alpha = (Math.PI * 0.42) * bOpen;   // capped ~76° max flatten
+        leftPivot.rotation.y  = alpha;
+        frontPivot.rotation.y = -alpha;           // front stays parallel to the back
+        rightPivot.rotation.y = alpha;            // right parallel to left → loop stays closed
+        leftWall.position.x  = leftWallX0;
+        rightWall.position.x = rightWallX0;
+        boxGroup.position.x = -D * Math.sin(alpha) / 2;  // keep the flattening centred
+        // base flaps fold UP into the box along their creases, in step with the collapse
+        const foldA = 1.55 * bOpen;
+        frontFlap.rotation.x = foldA;
+        backFlap.rotation.x  = foldA;
+        leftTri.rotation.x   = foldA;
+        rightTri.rotation.x  = foldA;
       }
       applyFold(fold);
 
@@ -550,6 +649,8 @@
           fold += (foldTarget - fold) * 0.09;
           applyFold(fold);
         }
+        boxGroup.updateWorldMatrix(true, true);
+        updateClips();                // keep the base-clip planes on the walls
         renderer.render(scene, camera);
       })();
 
