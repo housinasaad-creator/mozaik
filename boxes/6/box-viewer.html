@@ -9,6 +9,12 @@
 </head>
 <body>
 
+  <div class="fold-ctrl" id="foldCtrl">
+    <span class="lbl" id="lblOpen">Open</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Close</span>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     "use strict";
@@ -209,7 +215,7 @@
            · slider = the whole folding motion: fully FLAT blank →
              half-folded (the reference photo) → assembled tray
          ========================================================= */
-      const W = 2.4, D = 2.4, WH = 0.72, T = 0.012;
+      const W = 2.4, D = 2.4, WH = 0.72, T = 0.004;   // thin board — walls + base + gusset all one thickness
 
       const trayGroup = new THREE.Group();
 
@@ -230,7 +236,7 @@
          each wall: fixed FRAME (orientation) → animated HINGE (rotation.x
          only) → BoxGeometry wall + two gusset pivots on its side edges.
          Uniform local convention: local -z = tray interior for every wall. */
-      function makeWall(width, frameRotY, framePos, faceMats) {
+      function makeWall(width, frameRotY, framePos, faceMats, cutTop) {
         const frame = new THREE.Group();
         frame.rotation.y = frameRotY;
         frame.position.copy(framePos);
@@ -239,8 +245,31 @@
         const hinge = new THREE.Group();
         frame.add(hinge);
 
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, WH, T), faceMats);
-        mesh.position.set(0, WH / 2, T / 2);       // thickness on the OUTER side of the hinge line
+        let mesh;
+        if (cutTop) {
+          // trapezoid: full width at the base, both TOP corners cut off at 45° — the
+          // grey-crease triangles are physically REMOVED, so the corners stay open.
+          const shape = new THREE.Shape();
+          shape.moveTo(-width / 2, 0);
+          shape.lineTo(width / 2, 0);
+          shape.lineTo(width / 2 - WH, WH);
+          shape.lineTo(-width / 2 + WH, WH);
+          shape.closePath();
+          const geo = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false });
+          const p = geo.attributes.position, uv = geo.attributes.uv;
+          for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + width / 2) / width, p.getY(i) / WH);
+          uv.needsUpdate = true;
+          // logo only on the OUTER cap (z ≈ T); inner cap + edges stay plain white
+          geo.clearGroups();
+          for (let f = 0; f < p.count; f += 3) {
+            const zc = (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3;
+            geo.addGroup(f, 3, zc > T - 1e-4 ? 0 : 1);
+          }
+          mesh = new THREE.Mesh(geo, [faceMats[4], plainW()]);
+        } else {
+          mesh = new THREE.Mesh(new THREE.BoxGeometry(width, WH, T), faceMats);
+          mesh.position.set(0, WH / 2, T / 2);     // thickness on the OUTER side of the hinge line
+        }
         mesh.castShadow = mesh.receiveShadow = true;
         hinge.add(mesh);
 
@@ -256,10 +285,10 @@
         cardMat(logoPanelTexture(1200, 380, 0.4)),
         innerTex ? cardMat(innerTex) : plainW()
       ];
-      const frontWall = makeWall(W, 0,        new THREE.Vector3(0, T, D / 2 - T), mkLogoWallMats());
-      const backWall  = makeWall(W, Math.PI,  new THREE.Vector3(0, T, -D / 2 + T), mkLogoWallMats());
-      const leftWall  = makeWall(D, -Math.PI / 2, new THREE.Vector3(-W / 2 + T, T, 0), mkLogoWallMats(creasedInnerTexture(D, 1200, 380)));
-      const rightWall = makeWall(D,  Math.PI / 2, new THREE.Vector3( W / 2 - T, T, 0), mkLogoWallMats(creasedInnerTexture(D, 1200, 380)));
+      const frontWall = makeWall(W, 0,        new THREE.Vector3(0, T, D / 2 - T), mkLogoWallMats(), false);
+      const backWall  = makeWall(W, Math.PI,  new THREE.Vector3(0, T, -D / 2 + T), mkLogoWallMats(), false);
+      const leftWall  = makeWall(D, -Math.PI / 2, new THREE.Vector3(-W / 2 + T, T, 0), mkLogoWallMats(), true);
+      const rightWall = makeWall(D,  Math.PI / 2, new THREE.Vector3( W / 2 - T, T, 0), mkLogoWallMats(), true);
 
       const allWalls = [frontWall, backWall, leftWall, rightWall];
 
@@ -275,7 +304,8 @@
       const gussets = [];
       function topCornerWorld(wall, sx) {
         // top-outer corner of the wall's end edge, in world space
-        return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, WH, 0));
+        const topY = wall.mesh.geometry.type === "BoxGeometry" ? WH / 2 : WH;
+        return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, topY, 0));
       }
       function addGusset(fbWall, fbSign, sideWall, cornerX, cornerZ) {
         const geo = new THREE.BufferGeometry();
@@ -300,8 +330,9 @@
         const tmp = new THREE.Vector3();
         gussets.forEach((g) => {
           const baseW = trayGroup.localToWorld(g.base.clone());   // base is tray-local
-          const pFB = topCornerWorld(g.fbWall, g.fbSign);         // already world
-          const pSide = topCornerWorld(g.sideWall, g.sideSign);   // already world
+          const pFB = topCornerWorld(g.fbWall, g.fbSign);         // front/back wall top corner
+          // side wall CUT corner (inward by WH — the trapezoid's top corner)
+          const pSide = g.sideWall.mesh.localToWorld(new THREE.Vector3(g.sideSign * (g.sideWall.width / 2 - WH), WH, 0));
           const pos = g.geo.attributes.position.array;
           [baseW, pFB, pSide].forEach((p, i) => {
             tmp.copy(p); g.mesh.worldToLocal(tmp);
@@ -318,10 +349,10 @@
       addGusset(backWall,   1, leftWall,  -W / 2, -D / 2);  // back-left
       addGusset(backWall,  -1, rightWall,  W / 2, -D / 2);  // back-right
       gussets.forEach((g) => { g.sideSign = matchSideSign(g.sideWall, g.base.z); });
-      // this box is a static standing tray (no fold slider) — the corner webs
-      // are only meaningful during folding, so hide them; the vertical walls
-      // already meet cleanly at each corner post
-      gussets.forEach((g) => { g.mesh.visible = false; });
+      // all FOUR corner gusset triangles are the CONNECTION POINTS between adjacent faces
+      // — each welded to its front/back wall (edge A→B) and its side wall's cut diagonal
+      // (edge A→C), re-formed every frame so they never gap (see updateGussets).
+      gussets.forEach((g) => { g.mesh.visible = true; });
 
       scene.add(trayGroup);
       trayGroup.position.y = -0.55;
@@ -347,18 +378,38 @@
                        OUT the other way — all at the SAME time, so the box
                        lays flat. The dynamic corner webs stay welded to both
                        adjacent walls the whole way, with no gaps. */
-      // no slider on this box — it stays the assembled standing tray. The
-      // fold rig is kept (for __debug) but locked to the standing state.
+      /* t = 0 (Open) → standing tray. t = 1 is the final flat position:
+         front+back fold INWARD while left+right open OUTWARD. All four walls
+         sweep the same 90° at the same speed; there is no second fold phase. */
+      const HALF = Math.PI / 2;
       function applyFold(t) {
-        const c = 1 - t;                                  // collapse fraction
-        const a = (Math.PI / 2) * c;
-        frontWall.hinge.rotation.x = -a;                  // fold INWARD, over the base
-        backWall.hinge.rotation.x  = -a;
-        leftWall.hinge.rotation.x  =  a;                  // fold OUTWARD, the other way
-        rightWall.hinge.rotation.x =  a;
-        updateGussets();
+        const progress = Math.min(1, Math.max(0, t));
+        frontWall.hinge.rotation.x = -HALF * progress;
+        backWall.hinge.rotation.x  = -HALF * progress;
+        leftWall.hinge.rotation.x  =  HALF * progress;
+        rightWall.hinge.rotation.x =  HALF * progress;
+        leftWall.frame.position.y  = T;
+        rightWall.frame.position.y = T;
+        updateGussets();   // re-weld all 4 corner gussets to both walls (no gaps)
       }
-      applyFold(1);
+      let foldTarget = 0, fold = 0;   // start OPEN (standing tray)
+      applyFold(fold);
+
+      /* ---------- slider wiring ---------- */
+      const foldSlider = document.getElementById("foldSlider");
+      const lblOpen = document.getElementById("lblOpen");
+      const lblClose = document.getElementById("lblClose");
+      function paintSlider() {
+        const v = +foldSlider.value;
+        foldSlider.style.setProperty("--val", (v * 100) + "%");
+        lblClose.classList.toggle("active", v > 0.5);
+        lblOpen.classList.toggle("active", v <= 0.5);
+      }
+      foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
+      paintSlider();
+      ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
+        foldSlider.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+      });
 
       /* ---------- drag to rotate 360° (mouse + 1-finger touch) ---------- */
       let dragging = false, px = 0, py = 0;
@@ -428,11 +479,12 @@
         requestAnimationFrame(animate);
         if (window.__mzkPaused) return;
         if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
+        if (Math.abs(foldTarget - fold) > 0.0005) { fold += (foldTarget - fold) * 0.09; applyFold(fold); }
         renderer.render(scene, camera);
       })();
 
       window.__debug = { THREE, boxGroup, trayGroup, frontWall, backWall, leftWall, rightWall, camera, scene,
-        setFold: (t) => applyFold(t) };
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
 
       console.log("✓ four-corner tray ready");
     }

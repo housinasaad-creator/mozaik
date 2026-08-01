@@ -10,9 +10,9 @@
 <body>
 
   <div class="fold-ctrl" id="foldCtrl">
-    <span class="lbl" id="lblOpen">Open</span>
-    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0.22" />
-    <span class="lbl" id="lblClose">Close</span>
+    <span class="lbl" id="lblOpen">Close</span>
+    <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
+    <span class="lbl" id="lblClose">Open</span>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -624,7 +624,7 @@
         shape.absarc(0, len, R, 0, Math.PI, true); // semicircle dipping INTO the tab
         shape.lineTo(-w / 2, len);
         shape.closePath();
-        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, curveSegments: 10 }));
+        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false, curveSegments: 28 }));
         geo.rotateX(Math.PI / 2); // shape length → +z, extrude → -y thickness
         geo.translate(0, thick / 2, 0); // center the thickness
         return geo;
@@ -633,23 +633,22 @@
       /* =========================================================
          GEOMETRY — six-corner mailer shape (from box 7) with Hot Foil
          colours: navy exterior, white lid + interior, gold foil logo.
-         Slider controls ONLY the top lid open/close.
+         Slider follows the current three-phase closed-to-flat sequence.
          ========================================================= */
-      const BOX_W = 3.0, BOX_D = 2.0, BOX_H = 0.62, T = 0.02, FLOOR_T = 0.02;
+      const BOX_W = 3.0, BOX_D = 2.0, BOX_H = 0.62, T = 0.004, FLOOR_T = T;
 
       const trayGroup = new THREE.Group();
 
       const whiteTex = plainPanel(512, 512, WHITE, 0.5);
       const navyTex = plainPanel(512, 512, NAVY, 0.5);
+      const baseSideLogoTex = logoPanelTexture(700, 220, NAVY, 0.30, true, 0, 0.81);
+      const lidSideLogoTex = logoPanelTexture(700, 220, NAVY, 0.30, true, Math.PI / 2, 0.81);
       // gold on lid rim + logos; ornaments — half-res maps (big FPS/VRAM win)
       const lidTopMaps = navyLidFrameMaps(700, 450);   // upper lid — rounded gold frame only
-      const tabMaps = foilTabMaps(700, 150); // lock tab + gold foil logo
-      const sideOrnTex = sideOrnamentTexture(700, 220); // left/right ends — frame + shapes
       const lidInTex = plainPanel(512, 512, WHITE, 0.4);   // interior: plain white
       const creaseInnerTex = creasedInnerTexture(700, 150, BOX_W); // long-wall interior + glue creases
       const oMat = (maps) => foilMat(maps);
       const navyMat = () => cardMat(navyTex);
-      const sideOrnMat = () => cardMat(sideOrnTex);
 
       /* ---------- floor ---------- */
       const floor = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, FLOOR_T, BOX_D), [
@@ -662,50 +661,133 @@
       floor.castShadow = floor.receiveShadow = true;
       trayGroup.add(floor);
 
-      // face order [+x,-x,+y,-y,+z,-z] = [right,left,top,bottom,front,back]
-      // board THICKNESS edges stay NAVY so corners never flash a white seam line
-      const wI = () => cardMat(whiteTex); // interior white (inner face only)
-      // back wall — plain navy exterior; only +z (inside) is white
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        navyMat(), navyMat(), navyMat(), navyMat(), cardMat(creaseInnerTex), navyMat()
-      ]);
-      backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + T / 2);
-      backWall.castShadow = backWall.receiveShadow = true;
-      trayGroup.add(backWall);
+      const wI = () => cardMat(whiteTex);
+      const W = BOX_W, D = BOX_D, WH = BOX_H;
 
-      // front wall — plain navy + LIVE gold foil logo; only -z (inside) is white
-      const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        navyMat(), navyMat(), navyMat(), navyMat(), navyMat(), cardMat(creaseInnerTex)
-      ]);
-      frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - T / 2);
-      frontWall.castShadow = frontWall.receiveShadow = true;
-      trayGroup.add(frontWall);
+      /* ---------- base walls + four dynamic corner gussets ---------- */
+      function makeWall(width, frameRotY, framePos, outerTex, innerTex, cutTop) {
+        const frame = new THREE.Group();
+        frame.rotation.y = frameRotY;
+        frame.position.copy(framePos);
+        trayGroup.add(frame);
+
+        const hinge = new THREE.Group();
+        frame.add(hinge);
+
+        let mesh;
+        if (cutTop) {
+          const shape = new THREE.Shape();
+          shape.moveTo(-width / 2, 0);
+          shape.lineTo(width / 2, 0);
+          shape.lineTo(width / 2 - WH, WH);
+          shape.lineTo(-width / 2 + WH, WH);
+          shape.closePath();
+          const geo = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false });
+          const p = geo.attributes.position, uv = geo.attributes.uv;
+          for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + width / 2) / width, p.getY(i) / WH);
+          uv.needsUpdate = true;
+          geo.clearGroups();
+          for (let f = 0; f < p.count; f += 3) {
+            const zc = (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3;
+            const mat = zc > T - 1e-4 ? 0 : (zc < 1e-4 ? 1 : 2);
+            geo.addGroup(f, 3, mat);
+          }
+          mesh = new THREE.Mesh(geo, [cardMat(outerTex), innerTex ? cardMat(innerTex) : wI(), navyMat()]);
+        } else {
+          mesh = new THREE.Mesh(new THREE.BoxGeometry(width, WH, T), [
+            navyMat(), navyMat(), navyMat(), navyMat(),
+            cardMat(outerTex), innerTex ? cardMat(innerTex) : wI()
+          ]);
+          mesh.position.set(0, WH / 2, T / 2);
+        }
+        mesh.castShadow = mesh.receiveShadow = true;
+        hinge.add(mesh);
+        return { frame, hinge, mesh, width };
+      }
+
+      const frontWall = makeWall(W, 0,            new THREE.Vector3(0, FLOOR_T,  D / 2 - T), navyTex, creaseInnerTex, false);
+      const backWall  = makeWall(W, Math.PI,      new THREE.Vector3(0, FLOOR_T, -D / 2 + T), navyTex, creaseInnerTex, false);
+      const leftWall  = makeWall(D, -Math.PI / 2, new THREE.Vector3(-W / 2 + T, FLOOR_T, 0), baseSideLogoTex, null, true);
+      const rightWall = makeWall(D,  Math.PI / 2, new THREE.Vector3( W / 2 - T, FLOOR_T, 0), baseSideLogoTex, null, true);
+
       const frontFoil = makeFoilDecal(BOX_W, 0.26);
       if (frontFoil) {
         frontFoil.position.set(0, 0, T / 2 + 0.0015);
-        frontWall.add(frontFoil);
+        frontWall.mesh.add(frontFoil);
       }
 
-      // left / right ends — ornaments outside; white ONLY on the inner face
-      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        wI(), sideOrnMat(), navyMat(), navyMat(), navyMat(), navyMat()
-      ]);
-      leftWall.position.set(-BOX_W / 2 + T / 2, BOX_H / 2 + FLOOR_T, 0);
-      leftWall.castShadow = leftWall.receiveShadow = true;
-      trayGroup.add(leftWall);
+      const gussets = [];
+      function topCornerWorld(wall, sx) {
+        if (wall.mesh.geometry.type === "BoxGeometry") {
+          return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, WH / 2, T / 2));
+        }
+        return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, WH, T));
+      }
+      function addGusset(fbWall, fbSign, sideWall, cornerX, cornerZ) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+        geo.setIndex([0, 1, 2]);
+        const innerMat = cardMat(whiteTex);
+        innerMat.side = THREE.FrontSide;
+        const outerMat = cardMat(navyTex);
+        outerMat.side = THREE.BackSide;
+        [innerMat, outerMat].forEach((m) => {
+          m.polygonOffset = true;
+          m.polygonOffsetFactor = -1;
+          m.polygonOffsetUnits = -1;
+        });
+        const mesh = new THREE.Mesh(geo, innerMat);
+        const outerMesh = new THREE.Mesh(geo, outerMat);
+        mesh.castShadow = mesh.receiveShadow = true;
+        outerMesh.castShadow = outerMesh.receiveShadow = true;
+        trayGroup.add(mesh);
+        trayGroup.add(outerMesh);
+        gussets.push({ mesh, outerMesh, geo, fbWall, fbSign, sideWall, base: new THREE.Vector3(cornerX, FLOOR_T, cornerZ) });
+      }
+      function matchSideSign(sideWall, cornerZ) {
+        trayGroup.updateMatrixWorld(true);
+        const a = topCornerWorld(sideWall, 1).z, b = topCornerWorld(sideWall, -1).z;
+        return Math.abs(a - cornerZ) < Math.abs(b - cornerZ) ? 1 : -1;
+      }
+      function updateGussets() {
+        trayGroup.updateMatrixWorld(true);
+        const tmp = new THREE.Vector3();
+        gussets.forEach((g) => {
+          const baseW = g.sideWall.mesh.localToWorld(
+            new THREE.Vector3(g.sideSign * g.sideWall.width / 2, 0, T)
+          );
+          const pFB = topCornerWorld(g.fbWall, g.fbSign);
+          const pSide = g.sideWall.mesh.localToWorld(
+            new THREE.Vector3(g.sideSign * (g.sideWall.width / 2 - WH), WH, T)
+          );
+          if (g.flip === undefined) {
+            const probe = trayGroup.localToWorld(new THREE.Vector3(0, WH * 0.75, 0));
+            const normal = new THREE.Vector3().subVectors(pFB, baseW)
+              .cross(new THREE.Vector3().subVectors(pSide, baseW));
+            const centroid = baseW.clone().add(pFB).add(pSide).multiplyScalar(1 / 3);
+            g.flip = normal.dot(probe.sub(centroid)) < 0;
+          }
+          const points = g.flip ? [baseW, pSide, pFB] : [baseW, pFB, pSide];
+          const pos = g.geo.attributes.position.array;
+          points.forEach((p, i) => {
+            tmp.copy(p); g.mesh.worldToLocal(tmp);
+            pos[i * 3] = tmp.x; pos[i * 3 + 1] = tmp.y; pos[i * 3 + 2] = tmp.z;
+          });
+          g.geo.attributes.position.needsUpdate = true;
+          g.geo.computeVertexNormals();
+        });
+      }
+      addGusset(frontWall, -1, leftWall,  -W / 2,  D / 2);
+      addGusset(frontWall,  1, rightWall,  W / 2,  D / 2);
+      addGusset(backWall,   1, leftWall,  -W / 2, -D / 2);
+      addGusset(backWall,  -1, rightWall,  W / 2, -D / 2);
+      gussets.forEach((g) => { g.sideSign = matchSideSign(g.sideWall, g.base.z); g.mesh.visible = true; });
 
-      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        sideOrnMat(), wI(), navyMat(), navyMat(), navyMat(), navyMat()
-      ]);
-      rightWall.position.set(BOX_W / 2 - T / 2, BOX_H / 2 + FLOOR_T, 0);
-      rightWall.castShadow = rightWall.receiveShadow = true;
-      trayGroup.add(rightWall);
-
-      /* ---------- top LID: hinged at the back top edge ---------- */
-      const TOP_Y = FLOOR_T + BOX_H;
+      /* ---------- top LID: welded to the dynamic back wall ---------- */
       const lidPivot = new THREE.Group();
-      lidPivot.position.set(0, TOP_Y, -BOX_D / 2 + T);
-      trayGroup.add(lidPivot);
+      lidPivot.position.set(0, WH, 0);
+      backWall.hinge.add(lidPivot);
 
       // lid — rounded gold frame on top + LIVE foil logo; white interior
       const lid = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, T, BOX_D), [
@@ -714,7 +796,7 @@
         cardMat(lidInTex),
         navyMat(), navyMat()
       ]);
-      lid.position.set(0, T / 2, BOX_D / 2); // extends forward from the hinge
+      lid.position.set(0, T / 2, -BOX_D / 2);
       lid.castShadow = lid.receiveShadow = true;
       lidPivot.add(lid);
       const lidFoil = makeFoilDecal(BOX_W, 0.34);
@@ -734,13 +816,16 @@
 
       // main front tab — hinge at the lid's front edge, folds down OUTSIDE
       const tuckPivot = new THREE.Group();
-      tuckPivot.position.set(0, 0, BOX_D); // lid front edge (just outside the front wall)
-      tuckPivot.rotation.x = Math.PI / 2; // fold DOWN over the outer front face
+      const TUCK_Z = -BOX_D;
+      const SKIRT_DIR = -1;
+      tuckPivot.position.set(0, 0, TUCK_Z);
+      tuckPivot.rotation.x = -Math.PI / 2;
       lidPivot.add(tuckPivot);
       const tuck = new THREE.Mesh(
         notchedTabGeometry(BOX_W, TUCK_H, T, BOX_H * 0.3), // finger notch on the free edge
-        [foilMat(tabMaps), navyMat()] // outer cap = gold foil logo, edges = plain navy
+        [navyMat(), navyMat()]
       );
+      tuck.scale.z = -1;
       tuck.position.set(0, 0, 0); // extends out → after the pivot fold, hangs DOWN over the outside
       tuck.castShadow = tuck.receiveShadow = true;
       tuckPivot.add(tuck);
@@ -752,29 +837,112 @@
         notchedTabGeometry(BOX_W - 0.02, TUCK_H - 0.01, T * 0.3, BOX_H * 0.3),
         cardMat(plainPanel(512, 512, WHITE, 0.4))
       );
+      tuckLiner.scale.z = -1;
       tuckLiner.position.set(0, -T * 0.45, 0);   // just behind the inner cap
       tuckPivot.add(tuckLiner);
 
-      // two side tabs — white ornaments on outer face (rotated to follow long z-axis)
-      const sideTabFace = sideOrnamentTexture(700, 220);
-      sideTabFace.center.set(0.5, 0.5); sideTabFace.rotation = Math.PI / 2;
+      // two side ears — plain navy on both sides
+      function upperSideWallGeometry(sx) {
+        const hingeX = -sx * TUCK_H / 2;
+        const freeX = sx * TUCK_H / 2;
+        const shape = new THREE.Shape();
+        shape.moveTo(hingeX, -BOX_D / 2);
+        shape.lineTo(freeX, -BOX_D / 2 + TUCK_H);
+        shape.lineTo(freeX, BOX_D / 2);
+        shape.lineTo(hingeX, BOX_D / 2);
+        shape.closePath();
+        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false }));
+        geo.rotateX(Math.PI / 2);
+        geo.translate(0, T / 2, 0);
+        const pos = geo.attributes.position;
+        geo.clearGroups();
+        for (let f = 0; f < pos.count; f += 3) {
+          const yc = (pos.getY(f) + pos.getY(f + 1) + pos.getY(f + 2)) / 3;
+          const materialIndex = yc > T * 0.25 ? 0 : (yc < -T * 0.25 ? 1 : 2);
+          geo.addGroup(f, 3, materialIndex);
+        }
+        return geo;
+      }
       const sideTucks = [];
       [-1, 1].forEach((sx) => {
         const p = new THREE.Group();
-        p.position.set(sx * BOX_W / 2, 0, BOX_D / 2); // lid side edge, centered in depth
-        p.rotation.z = -sx * Math.PI / 2; // fold down over the outer side face
+        p.position.set(sx * BOX_W / 2, 0, -BOX_D / 2);
+        p.rotation.z = -sx * Math.PI / 2;
         lidPivot.add(p);
-        const st = new THREE.Mesh(new THREE.BoxGeometry(TUCK_H, T, BOX_D), [
-          navyMat(), navyMat(),
-          cardMat(sideTabFace),                              // +y = OUTER: white frame + shapes
-          cardMat(plainPanel(512, 512, WHITE, 0.4)),         // -y = INNER face: plain white
-          navyMat(), navyMat()
+        const st = new THREE.Mesh(upperSideWallGeometry(sx), [
+          navyMat(),
+          navyMat(),
+          navyMat()
         ]);
-        st.position.set(sx * TUCK_H / 2, 0, 0); // extends out → hangs down full height after fold
+        st.position.set(sx * TUCK_H / 2, 0, 0);
         st.castShadow = st.receiveShadow = true;
         p.add(st);
+        p.userData.sideSign = sx;
+        p.userData.panel = st;
         sideTucks.push(p);
       });
+
+      /* ---------- two dynamic upper corner gussets ---------- */
+      const upperGussets = [];
+      function addUpperGusset(sx, sidePivot) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+        geo.setIndex([0, 1, 2]);
+        const innerMat = cardMat(navyTex);
+        innerMat.side = THREE.FrontSide;
+        const outerMat = cardMat(navyTex);
+        outerMat.side = THREE.BackSide;
+        [innerMat, outerMat].forEach((m) => {
+          m.polygonOffset = true;
+          m.polygonOffsetFactor = -1;
+          m.polygonOffsetUnits = -1;
+        });
+        const mesh = new THREE.Mesh(geo, innerMat);
+        const outerMesh = new THREE.Mesh(geo, outerMat);
+        mesh.castShadow = mesh.receiveShadow = true;
+        outerMesh.castShadow = outerMesh.receiveShadow = true;
+        lidPivot.add(mesh);
+        lidPivot.add(outerMesh);
+        upperGussets.push({ sx, sidePivot, mesh, outerMesh, geo });
+      }
+      sideTucks.forEach((p) => addUpperGusset(p.userData.sideSign, p));
+
+      function updateUpperGussets() {
+        lidPivot.updateMatrixWorld(true);
+        const tmp = new THREE.Vector3();
+        upperGussets.forEach((g) => {
+          const panel = g.sidePivot.userData.panel;
+          const yOut = T / 2;
+          const corner = panel.localToWorld(
+            new THREE.Vector3(-g.sx * TUCK_H / 2, yOut, -BOX_D / 2)
+          );
+          const sideFree = panel.localToWorld(
+            new THREE.Vector3(g.sx * TUCK_H / 2, yOut, -BOX_D / 2 + TUCK_H)
+          );
+          const frontFree = tuck.localToWorld(
+            new THREE.Vector3(g.sx * BOX_W / 2, yOut, TUCK_H)
+          );
+          const ref = new THREE.Vector3(0, -1, 0).applyQuaternion(
+            panel.getWorldQuaternion(new THREE.Quaternion())
+          );
+          const normal = new THREE.Vector3().subVectors(frontFree, corner)
+            .cross(new THREE.Vector3().subVectors(sideFree, corner));
+          const points = normal.dot(ref) >= 0
+            ? [corner, frontFree, sideFree]
+            : [corner, sideFree, frontFree];
+          const pos = g.geo.attributes.position.array;
+          points.forEach((point, i) => {
+            tmp.copy(point);
+            g.mesh.worldToLocal(tmp);
+            pos[i * 3] = tmp.x;
+            pos[i * 3 + 1] = tmp.y;
+            pos[i * 3 + 2] = tmp.z;
+          });
+          g.geo.attributes.position.needsUpdate = true;
+          g.geo.computeVertexNormals();
+        });
+      }
 
       scene.add(trayGroup);
       trayGroup.position.y = -0.6;
@@ -793,13 +961,36 @@
       shadowCatcher.receiveShadow = true;
       scene.add(shadowCatcher);
 
-      /* ---------- fold state: 0 = lid open, 1 = lid closed (top face only) ---------- */
+      /* ---------- exact three-phase display-to-flat sequence ---------- */
+      const HALF = Math.PI / 2;
       const OPEN_ANGLE = 2.15;
-      // start slightly open so the box isn't dark / fully shut on load
-      let foldTarget = 0.22, fold = 0.22;
+      const UPPER_FLAT = 1.0;
+      const BASE_FLAT = 0.95;
+      let foldTarget = 0, fold = 0;
       function applyFold(t) {
-        lidPivot.rotation.x = -OPEN_ANGLE * (1 - t); // t=1 closed (flat), t=0 open UP & back
+        const progress = Math.min(1, Math.max(0, t));
+        const lidOpen = Math.min(1, Math.max(0, progress / (1 / 3)));
+        const upper   = Math.min(1, Math.max(0, (progress - 1 / 3) / (1 / 3)));
+        const base    = Math.min(1, Math.max(0, (progress - 2 / 3) / (1 / 3)));
+        const baseFold = BASE_FLAT * base;
+
+        frontWall.hinge.rotation.x = -HALF * baseFold;
+        backWall.hinge.rotation.x  = -HALF * baseFold;
+        leftWall.hinge.rotation.x  =  HALF * baseFold;
+        rightWall.hinge.rotation.x =  HALF * baseFold;
+        leftWall.frame.position.y  = FLOOR_T;
+        rightWall.frame.position.y = FLOOR_T;
+
+        lidPivot.rotation.x = OPEN_ANGLE * lidOpen * (1 - base) + HALF * baseFold;
+        tuckPivot.rotation.x = SKIRT_DIR * HALF * (1 + UPPER_FLAT * upper);
+        sideTucks.forEach((p) => {
+          p.rotation.z = -p.userData.sideSign * HALF * (1 - UPPER_FLAT * upper);
+        });
+
+        updateGussets();
+        updateUpperGussets();
       }
+      applyFold(1 / 3);
       applyFold(fold);
 
       const foldSlider = document.getElementById("foldSlider");
@@ -811,7 +1002,6 @@
         lblClose.classList.toggle("active", v > 0.5);
         lblOpen.classList.toggle("active", v <= 0.5);
       }
-      foldSlider.value = String(foldTarget);
       foldSlider.addEventListener("input", () => { foldTarget = +foldSlider.value; paintSlider(); resetIdle(); });
       paintSlider();
       ["pointerdown", "mousedown", "mousemove", "touchstart", "touchmove"].forEach((type) => {
@@ -904,7 +1094,7 @@
         renderer.render(scene, camera);
       })();
 
-      window.__debug = { THREE, boxGroup, trayGroup, lidPivot, lid, tuck, tuckPivot, sideTucks, camera, scene, renderer, rot, foilDecals,
+      window.__debug = { THREE, boxGroup, trayGroup, frontWall, backWall, leftWall, rightWall, gussets, lidPivot, lid, tuck, tuckPivot, sideTucks, upperGussets, camera, scene, renderer, rot, foilDecals,
         setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
 
       console.log("✓ mailer box ready");

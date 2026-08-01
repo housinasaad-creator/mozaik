@@ -10,9 +10,9 @@
 <body>
 
   <div class="fold-ctrl" id="foldCtrl">
-    <span class="lbl" id="lblOpen">Open</span>
+    <span class="lbl" id="lblOpen">Close</span>
     <input type="range" id="foldSlider" min="0" max="1" step="0.001" value="0" />
-    <span class="lbl" id="lblClose">Close</span>
+    <span class="lbl" id="lblClose">Open</span>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -377,19 +377,20 @@
          front TUCK flap that locks into the front wall.
          Slider controls ONLY the top lid open/close.
          ========================================================= */
-      const BOX_W = 3.0, BOX_D = 2.0, BOX_H = 0.62, T = 0.02, FLOOR_T = 0.02;
+      const BOX_W = 3.0, BOX_D = 2.0, BOX_H = 0.62, T = 0.004, FLOOR_T = T;
 
       const trayGroup = new THREE.Group();
 
       const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
       const cyanTex = plainPanel(1024, 512, CYAN, 0.5);
+      const navyTex = plainPanel(1024, 512, NAVY, 0.5);
       const frontTex = logoPanelTexture(1400, 380, CYAN, 0.26, false, 0, 0.81); // wide front wall: logo — subtitle line ("OFSET VE AMBALAJ") cropped off
       const pinkTexL = pinkEndTexture(1400, 440); // pink end: logo + shapes
       const pinkTexR = pinkEndTexture(1400, 440);
       const lidTopTex = logoPanelTexture(1400, 900, CYAN, 0.34, false, 0); // colored logo on cyan lid top
       const lidInTex = plainPanel(1024, 1024, WHITE, 0.4);   // interior: plain white — no logo, no text
       const creaseInnerTex = creasedInnerTexture(1400, 300, BOX_W); // long-wall interior + corner glue creases
-      const tabLogoTex = tabLogoTexture(1400, 300); // wide lock tab: cyan face + mirror-corrected, raised logo
+      const tabLogoTex = plainPanel(1400, 300, CYAN, 0.4); // wide lock tab: plain cyan, no logo
       const pinkTabTex = pinkEndTexture(1400, 440); // short lock tabs: pink + shapes
 
       /* ---------- floor ---------- */
@@ -400,52 +401,147 @@
       floor.castShadow = floor.receiveShadow = true;
       trayGroup.add(floor);
 
-      // face order [+x,-x,+y,-y,+z,-z] = [right,left,top,bottom,front,back]
-      // board THICKNESS edges stay CYAN so corner seams never flash a white column
-      const wI = () => cardMat(whiteTex); // interior white (inner face only)
+      const wI = () => cardMat(whiteTex);
       const cMat = () => cardMat(cyanTex);
-      // back wall — cyan outside; only +z (inside) is white
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        cMat(), cMat(), cMat(), cMat(), cardMat(creaseInnerTex), cMat()
-      ]);
-      backWall.position.set(0, BOX_H / 2 + FLOOR_T, -BOX_D / 2 + T / 2);
-      backWall.castShadow = backWall.receiveShadow = true;
-      trayGroup.add(backWall);
+      const W = BOX_W, D = BOX_D, WH = BOX_H;
 
-      // front wall — cyan + logo; only -z (inside) is white
-      const frontWall = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, BOX_H, T), [
-        cMat(), cMat(), cMat(), cMat(), cardMat(frontTex), cardMat(creaseInnerTex)
-      ]);
-      frontWall.position.set(0, BOX_H / 2 + FLOOR_T, BOX_D / 2 - T / 2);
-      frontWall.castShadow = frontWall.receiveShadow = true;
-      trayGroup.add(frontWall);
+      /* ---------- base walls + dynamic corner gussets ----------
+         Same system as the four-corner tray (boxes/6):
+         FRAME → HINGE → wall mesh; local -z = tray interior.
+         Front/back = full rectangles; sides = trapezoid cut tops.
+         Four live gusset triangles weld each corner while folding. */
+      function makeWall(width, frameRotY, framePos, faceMats, cutTop) {
+        const frame = new THREE.Group();
+        frame.rotation.y = frameRotY;
+        frame.position.copy(framePos);
+        trayGroup.add(frame);
 
-      // left / right ends — cyan outside; white ONLY on the inner face
-      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        wI(), cMat(), cMat(), cMat(), cMat(), cMat()
-      ]);
-      leftWall.position.set(-BOX_W / 2 + T / 2, BOX_H / 2 + FLOOR_T, 0);
-      leftWall.castShadow = leftWall.receiveShadow = true;
-      trayGroup.add(leftWall);
+        const hinge = new THREE.Group();
+        frame.add(hinge);
 
-      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(T, BOX_H, BOX_D), [
-        cMat(), wI(), cMat(), cMat(), cMat(), cMat()
-      ]);
-      rightWall.position.set(BOX_W / 2 - T / 2, BOX_H / 2 + FLOOR_T, 0);
-      rightWall.castShadow = rightWall.receiveShadow = true;
-      trayGroup.add(rightWall);
+        let mesh;
+        if (cutTop) {
+          const shape = new THREE.Shape();
+          shape.moveTo(-width / 2, 0);
+          shape.lineTo(width / 2, 0);
+          shape.lineTo(width / 2 - WH, WH);
+          shape.lineTo(-width / 2 + WH, WH);
+          shape.closePath();
+          const geo = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false });
+          const p = geo.attributes.position, uv = geo.attributes.uv;
+          for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + width / 2) / width, p.getY(i) / WH);
+          uv.needsUpdate = true;
+          geo.clearGroups();
+          for (let f = 0; f < p.count; f += 3) {
+            const zc = (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3;
+            // 0 = outer navy, 1 = inner white, 2 = board-thickness rim (navy)
+            const mat = zc > T - 1e-4 ? 0 : (zc < 1e-4 ? 1 : 2);
+            geo.addGroup(f, 3, mat);
+          }
+          mesh = new THREE.Mesh(geo, [faceMats[4], wI(), faceMats[4]]);
+        } else {
+          mesh = new THREE.Mesh(new THREE.BoxGeometry(width, WH, T), faceMats);
+          mesh.position.set(0, WH / 2, T / 2);
+        }
+        mesh.castShadow = mesh.receiveShadow = true;
+        hinge.add(mesh);
+        return { frame, hinge, mesh, width };
+      }
 
-      /* ---------- top LID: hinged at the back top edge ---------- */
-      const TOP_Y = FLOOR_T + BOX_H;
+      const mkWallMats = (outerTex, innerTex) => [
+        cMat(), cMat(), cMat(), cMat(),
+        cardMat(outerTex),
+        innerTex ? cardMat(innerTex) : wI()
+      ];
+      const frontWall = makeWall(W, 0,           new THREE.Vector3(0, FLOOR_T,  D / 2 - T), mkWallMats(frontTex, creaseInnerTex), false);
+      const backWall  = makeWall(W, Math.PI,     new THREE.Vector3(0, FLOOR_T, -D / 2 + T), mkWallMats(cyanTex, creaseInnerTex), false);
+      const leftWall  = makeWall(D, -Math.PI / 2, new THREE.Vector3(-W / 2 + T, FLOOR_T, 0), mkWallMats(navyTex), true);
+      const rightWall = makeWall(D,  Math.PI / 2, new THREE.Vector3( W / 2 - T, FLOOR_T, 0), mkWallMats(navyTex), true);
+
+      const gussets = [];
+      function topCornerWorld(wall, sx) {
+        // Outer top corner of the wall end. BoxGeometry is thickness-centered
+        // (outer = +T/2). ExtrudeGeometry side walls extrude outward to z = T.
+        if (wall.mesh.geometry.type === "BoxGeometry") {
+          return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, WH / 2, T / 2));
+        }
+        return wall.mesh.localToWorld(new THREE.Vector3(sx * wall.width / 2, WH, T));
+      }
+      function addGusset(fbWall, fbSign, sideWall, cornerX, cornerZ) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+        geo.setIndex([0, 1, 2]);
+        const innerMat = cardMat(whiteTex);
+        innerMat.side = THREE.FrontSide;
+        const outerMat = cardMat(navyTex);
+        outerMat.side = THREE.BackSide;
+        [innerMat, outerMat].forEach((m) => {
+          m.polygonOffset = true;
+          m.polygonOffsetFactor = -1;
+          m.polygonOffsetUnits = -1;
+        });
+        const mesh = new THREE.Mesh(geo, innerMat);
+        const outerMesh = new THREE.Mesh(geo, outerMat);
+        mesh.castShadow = mesh.receiveShadow = true;
+        outerMesh.castShadow = outerMesh.receiveShadow = true;
+        trayGroup.add(mesh);
+        trayGroup.add(outerMesh);
+        gussets.push({ mesh, outerMesh, geo, fbWall, fbSign, sideWall, base: new THREE.Vector3(cornerX, FLOOR_T, cornerZ) });
+      }
+      function matchSideSign(sideWall, cornerZ) {
+        trayGroup.updateMatrixWorld(true);
+        const a = topCornerWorld(sideWall, 1).z, b = topCornerWorld(sideWall, -1).z;
+        return Math.abs(a - cornerZ) < Math.abs(b - cornerZ) ? 1 : -1;
+      }
+      function updateGussets() {
+        trayGroup.updateMatrixWorld(true);
+        const tmp = new THREE.Vector3();
+        gussets.forEach((g) => {
+          // All side-wall tips on the OUTER face (local z = T) so the triangle
+          // sits in the same plane as the navy side and fills its cut flush.
+          const baseW = g.sideWall.mesh.localToWorld(
+            new THREE.Vector3(g.sideSign * g.sideWall.width / 2, 0, T)
+          );
+          const pFB = topCornerWorld(g.fbWall, g.fbSign);
+          const pSide = g.sideWall.mesh.localToWorld(
+            new THREE.Vector3(g.sideSign * (g.sideWall.width / 2 - WH), WH, T)
+          );
+          if (g.flip === undefined) {
+            const probe = trayGroup.localToWorld(new THREE.Vector3(0, WH * 0.75, 0));
+            const normal = new THREE.Vector3().subVectors(pFB, baseW)
+              .cross(new THREE.Vector3().subVectors(pSide, baseW));
+            const centroid = baseW.clone().add(pFB).add(pSide).multiplyScalar(1 / 3);
+            g.flip = normal.dot(probe.sub(centroid)) < 0;
+          }
+          const points = g.flip ? [baseW, pSide, pFB] : [baseW, pFB, pSide];
+          const pos = g.geo.attributes.position.array;
+          points.forEach((p, i) => {
+            tmp.copy(p); g.mesh.worldToLocal(tmp);
+            pos[i * 3] = tmp.x; pos[i * 3 + 1] = tmp.y; pos[i * 3 + 2] = tmp.z;
+          });
+          g.geo.attributes.position.needsUpdate = true;
+          g.geo.computeVertexNormals();
+        });
+      }
+      addGusset(frontWall, -1, leftWall,  -W / 2,  D / 2);
+      addGusset(frontWall,  1, rightWall,  W / 2,  D / 2);
+      addGusset(backWall,   1, leftWall,  -W / 2, -D / 2);
+      addGusset(backWall,  -1, rightWall,  W / 2, -D / 2);
+      gussets.forEach((g) => { g.sideSign = matchSideSign(g.sideWall, g.base.z); g.mesh.visible = true; });
+
+      /* ---------- top LID: hinged at the back wall top edge ---------- */
       const lidPivot = new THREE.Group();
-      lidPivot.position.set(0, TOP_Y, -BOX_D / 2 + T);
-      trayGroup.add(lidPivot);
+      // rides the back wall hinge so it stays welded when the base folds
+      lidPivot.position.set(0, WH, 0);
+      backWall.hinge.add(lidPivot);
 
-      // lid panel — top face (+y) cyan+logo, bottom face (-y) white+logo+OPEN
+      // lid panel — top face (+y) cyan+logo, bottom face (-y) white
+      // extends into the tray along local −z (back-wall interior)
       const lid = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, T, BOX_D), [
         cardMat(cyanTex), cardMat(cyanTex), cardMat(lidTopTex), cardMat(lidInTex), cardMat(cyanTex), cardMat(cyanTex)
       ]);
-      lid.position.set(0, T / 2, BOX_D / 2); // extends forward from the hinge
+      lid.position.set(0, T / 2, -BOX_D / 2);
       lid.castShadow = lid.receiveShadow = true;
       lidPivot.add(lid);
 
@@ -457,15 +553,23 @@
       // real glued/locked apron), all folding DOWN over the OUTER wall faces.
       const TUCK_H = BOX_H; // full height → reaches the base
 
-      // main front tab — hinge at the lid's front edge, folds down OUTSIDE
+      // main front tab — hinged at the lid's front edge and tucking DOWN on the
+      // INNER face of the front wall (real mailer lock), not over the outside
+      const TUCK_Z = -BOX_D; // crease line = the lid's front edge
+      // which way the lid's skirt creases: +1 = toward the tray (tongue aims
+      // into the box), -1 = toward the lid's white inner face (hangs back)
+      const SKIRT_DIR = -1;
       const tuckPivot = new THREE.Group();
-      tuckPivot.position.set(0, 0, BOX_D); // lid front edge (just outside the front wall)
-      tuckPivot.rotation.x = Math.PI / 2; // fold DOWN over the outer front face
+      tuckPivot.position.set(0, 0, TUCK_Z);
+      tuckPivot.rotation.x = -Math.PI / 2; // fold DOWN inside the front wall
       lidPivot.add(tuckPivot);
       const tuck = new THREE.Mesh(
         notchedTabGeometry(BOX_W, TUCK_H, T, BOX_H * 0.3), // finger notch on the free edge
         [cardMat(tabLogoTex), cardMat(cyanTex)] // caps = white + Mozaik logo, edges = cyan
       );
+      // The lid extends toward local -z, so mirror the front flap to extend
+      // away from its front edge instead of back across the lid.
+      tuck.scale.z = -1;
       tuck.position.set(0, 0, 0); // extends out → after the pivot fold, hangs DOWN over the outside
       tuck.castShadow = tuck.receiveShadow = true;
       tuckPivot.add(tuck);
@@ -477,6 +581,7 @@
         notchedTabGeometry(BOX_W - 0.02, TUCK_H - 0.01, T * 0.3, BOX_H * 0.3),
         cardMat(plainPanel(512, 512, WHITE, 0.4))
       );
+      tuckLiner.scale.z = -1;
       tuckLiner.position.set(0, -T * 0.45, 0);   // just behind the inner cap
       tuckPivot.add(tuckLiner);
 
@@ -485,26 +590,123 @@
       // The big +y/-y faces run x(short)×z(long), so the pattern texture must
       // be ROTATED 90° to align its shape row with the long z-axis (otherwise
       // the shapes get stretched into an unreadable mess)
-      const pinkTabFace = pinkEndTexture(1400, 440);
-      pinkTabFace.center.set(0.5, 0.5); pinkTabFace.rotation = Math.PI / 2;
-      const pinkTabEdge = () => cardMat(plainPanel(256, 256, PINK, 0.4));
+      const navyTabFace = plainPanel(1400, 440, NAVY, 0.4);
+      const navyTabEdge = () => cardMat(navyTex);
+
+      // Mirrored lid-side wall with its FRONT free corner cut diagonally.
+      // The live upper gusset fills this cut, exactly like each base corner.
+      function upperSideWallGeometry(sx) {
+        const hingeX = -sx * TUCK_H / 2;
+        const freeX = sx * TUCK_H / 2;
+        const shape = new THREE.Shape();
+        shape.moveTo(hingeX, -BOX_D / 2);
+        shape.lineTo(freeX, -BOX_D / 2 + TUCK_H);
+        shape.lineTo(freeX, BOX_D / 2);
+        shape.lineTo(hingeX, BOX_D / 2);
+        shape.closePath();
+
+        const geo = normalizeUVs(new THREE.ExtrudeGeometry(shape, {
+          depth: T, bevelEnabled: false
+        }));
+        // shape x/y → panel x/z, extrusion → centered y thickness
+        geo.rotateX(Math.PI / 2);
+        geo.translate(0, T / 2, 0);
+
+        // Separate pink outside, white inside and pink board edges.
+        const pos = geo.attributes.position;
+        geo.clearGroups();
+        for (let f = 0; f < pos.count; f += 3) {
+          const yc = (pos.getY(f) + pos.getY(f + 1) + pos.getY(f + 2)) / 3;
+          const materialIndex = yc > T * 0.25 ? 0 : (yc < -T * 0.25 ? 1 : 2);
+          geo.addGroup(f, 3, materialIndex);
+        }
+        return geo;
+      }
+
       const sideTucks = [];
       [-1, 1].forEach((sx) => {
         const p = new THREE.Group();
-        p.position.set(sx * BOX_W / 2, 0, BOX_D / 2); // lid side edge, centered in depth
-        p.rotation.z = -sx * Math.PI / 2; // fold down over the outer side face
+        p.position.set(sx * BOX_W / 2, 0, -BOX_D / 2); // lid side edge, centered in depth
+        p.rotation.z = -sx * Math.PI / 2; // mirrored upper wall: fold down outside
         lidPivot.add(p);
-        const st = new THREE.Mesh(new THREE.BoxGeometry(TUCK_H, T, BOX_D), [
-          pinkTabEdge(), pinkTabEdge(),
-          cardMat(pinkTabFace),                          // +y = OUTER face: pink + shapes
-          cardMat(plainPanel(512, 512, WHITE, 0.4)),     // -y = INNER face: plain white
-          pinkTabEdge(), pinkTabEdge()
+        const st = new THREE.Mesh(upperSideWallGeometry(sx), [
+          cardMat(navyTabFace),                          // +y = OUTER face
+          cardMat(navyTabFace),                          // -y = INNER face
+          navyTabEdge()                                  // cut/thickness edges
         ]);
         st.position.set(sx * TUCK_H / 2, 0, 0); // extends out → hangs down full height after fold
         st.castShadow = st.receiveShadow = true;
         p.add(st);
+        p.userData.sideSign = sx;
+        p.userData.panel = st;
         sideTucks.push(p);
       });
+
+      /* ---------- two dynamic upper corner gussets ----------
+         Mirrored version of the base-corner system. Each triangle stays
+         welded to the lid front flap and one side flap while they fold. */
+      const upperGussets = [];
+      function addUpperGusset(sx, sidePivot) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+        geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+        geo.setIndex([0, 1, 2]);
+        // Upper gusset is navy on both sides, matching the two lid ears.
+        const innerMat = cardMat(navyTex);
+        innerMat.side = THREE.FrontSide;
+        const outerMat = cardMat(navyTex);
+        outerMat.side = THREE.BackSide;
+        [innerMat, outerMat].forEach((m) => {
+          m.polygonOffset = true;
+          m.polygonOffsetFactor = -1;
+          m.polygonOffsetUnits = -1;
+        });
+        const mesh = new THREE.Mesh(geo, innerMat);
+        const outerMesh = new THREE.Mesh(geo, outerMat);
+        mesh.castShadow = mesh.receiveShadow = true;
+        outerMesh.castShadow = outerMesh.receiveShadow = true;
+        lidPivot.add(mesh);
+        lidPivot.add(outerMesh);
+        upperGussets.push({ sx, sidePivot, mesh, outerMesh, geo });
+      }
+      sideTucks.forEach((p) => addUpperGusset(p.userData.sideSign, p));
+
+      function updateUpperGussets() {
+        lidPivot.updateMatrixWorld(true);
+        const tmp = new THREE.Vector3();
+        upperGussets.forEach((g) => {
+          const panel = g.sidePivot.userData.panel;
+          // Outer face of the ear (+y) so the triangle is flush with that panel.
+          const yOut = T / 2;
+          const corner = panel.localToWorld(
+            new THREE.Vector3(-g.sx * TUCK_H / 2, yOut, -BOX_D / 2)
+          );
+          const sideFree = panel.localToWorld(
+            new THREE.Vector3(g.sx * TUCK_H / 2, yOut, -BOX_D / 2 + TUCK_H)
+          );
+          const frontFree = tuck.localToWorld(
+            new THREE.Vector3(g.sx * BOX_W / 2, yOut, TUCK_H)
+          );
+          const ref = new THREE.Vector3(0, -1, 0).applyQuaternion(
+            panel.getWorldQuaternion(new THREE.Quaternion())
+          );
+          const normal = new THREE.Vector3().subVectors(frontFree, corner)
+            .cross(new THREE.Vector3().subVectors(sideFree, corner));
+          const points = normal.dot(ref) >= 0
+            ? [corner, frontFree, sideFree]
+            : [corner, sideFree, frontFree];
+          const pos = g.geo.attributes.position.array;
+          points.forEach((point, i) => {
+            tmp.copy(point);
+            g.mesh.worldToLocal(tmp);
+            pos[i * 3] = tmp.x;
+            pos[i * 3 + 1] = tmp.y;
+            pos[i * 3 + 2] = tmp.z;
+          });
+          g.geo.attributes.position.needsUpdate = true;
+          g.geo.computeVertexNormals();
+        });
+      }
 
       scene.add(trayGroup);
       trayGroup.position.y = -0.6;
@@ -523,12 +725,48 @@
       shadowCatcher.receiveShadow = true;
       scene.add(shadowCatcher);
 
-      /* ---------- fold state: 0 = lid open, 1 = lid closed (top face only) ---------- */
+      /* ---------- display-to-flat sequence ----------
+         t = 0 → standing closed box (product display)
+         PHASE 1 (0→1/3): only the lid opens upward
+         PHASE 2 (1/3→2/3): the two lid corners open
+         PHASE 3 (2/3→1): the four base corners open to a flat blank */
+      const HALF = Math.PI / 2;
       const OPEN_ANGLE = 2.15;
+      const UPPER_FLAT = 1.0; // lid corners fold fully flat
+      const BASE_FLAT = 0.95;  // keep lower corners off the upper-ear plane
       let foldTarget = 0, fold = 0;
       function applyFold(t) {
-        lidPivot.rotation.x = -OPEN_ANGLE * (1 - t); // t=1 closed (flat), t=0 open UP & back
+        const progress = Math.min(1, Math.max(0, t));
+        const lidOpen = Math.min(1, Math.max(0, progress / (1 / 3)));                  // phase 1
+        const upper   = Math.min(1, Math.max(0, (progress - 1 / 3) / (1 / 3)));        // phase 2
+        const base    = Math.min(1, Math.max(0, (progress - 2 / 3) / (1 / 3)));        // phase 3
+        const baseFold = BASE_FLAT * base;
+
+        // Phase 3 — base holds standing until its four corners open
+        frontWall.hinge.rotation.x = -HALF * baseFold;
+        backWall.hinge.rotation.x  = -HALF * baseFold;
+        leftWall.hinge.rotation.x  =  HALF * baseFold;
+        rightWall.hinge.rotation.x =  HALF * baseFold;
+        leftWall.frame.position.y  = FLOOR_T;
+        rightWall.frame.position.y = FLOOR_T;
+
+        // Phase 1 opens only the lid. During phase 3 it follows the back wall
+        // down until the whole blank is flat.
+        lidPivot.rotation.x = OPEN_ANGLE * lidOpen * (1 - base) + HALF * baseFold;
+
+        // Phase 2 — lid corners open: pink ears spread outward and the notched
+        // tongue folds toward the lid's inner face.
+        tuckPivot.rotation.x = SKIRT_DIR * HALF * (1 + UPPER_FLAT * upper);
+        sideTucks.forEach((p) => {
+          p.rotation.z = -p.userData.sideSign * HALF * (1 - UPPER_FLAT * upper);
+        });
+
+        updateGussets();
+        updateUpperGussets();
       }
+      // Lock gusset winding while the box is standing, open and assembled,
+      // then park at the product-display start pose.
+      applyFold(1 / 3);
       applyFold(fold);
 
       const foldSlider = document.getElementById("foldSlider");
@@ -621,7 +859,7 @@
         renderer.render(scene, camera);
       })();
 
-      window.__debug = { THREE, boxGroup, trayGroup, lidPivot, lid, tuck, tuckPivot, sideTucks, camera, scene,
+      window.__debug = { THREE, boxGroup, trayGroup, frontWall, backWall, leftWall, rightWall, gussets, lidPivot, lid, tuck, tuckPivot, sideTucks, upperGussets, camera, scene, renderer,
         setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
 
       console.log("✓ mailer box ready");
