@@ -402,18 +402,35 @@
         return hinge;
       }
 
-      const flapMatF = cardMat(creaseFlapTexture(1024, 512, true));
-      const flapMatB = cardMat(creaseFlapTexture(1024, 512, true));
+      // split an extruded flap's two caps into separate material slots so each flap can be
+      // navy on the OUTSIDE face and white on the INSIDE. After geo.rotateX(-90°) the flap
+      // is T thick along +y: the +y cap points UP into the box (interior) and the -y cap
+      // points DOWN out of the box (exterior). Group 0 = exterior (-y) + thin sides → navy,
+      // group 1 = interior (+y) → white. ExtrudeGeometry is non-indexed (3 verts per tri).
+      function twoToneCaps(geo) {
+        geo.clearGroups();
+        const n = geo.attributes.normal;
+        for (let i = 0; i < n.count; i += 3) {
+          const ny = (n.getY(i) + n.getY(i + 1) + n.getY(i + 2)) / 3;
+          geo.addGroup(i, 3, ny > 0.5 ? 1 : 0);
+        }
+        return geo;
+      }
+      // base flaps: NAVY outside, WHITE inside (matches the box body). Every flap — the two
+      // wide main flaps AND the corner triangles — uses the same pair, so from below the
+      // base reads as one solid navy and from inside it reads all white. Fresh materials per
+      // flap because the clipping planes are assigned per-material below.
+      const flapNavyTex  = plainPanel(1024, 1024, NAVY, 0.3);
+      const flapWhiteTex = plainPanel(1024, 1024, WHITE, 0.5);
+      const baseFlapMats = () => [cardMat(flapNavyTex), cardMat(flapWhiteTex)]; // [0]=navy ext+sides, [1]=white interior
       // front main flap: hinge along the front wall's bottom edge
-      const frontFlap = makeFlap(mainFlapGeometry(), flapMatF, 0, new THREE.Vector3(0, 0.002, D / 2));
+      const frontFlap = makeFlap(twoToneCaps(mainFlapGeometry()), baseFlapMats(), 0, new THREE.Vector3(0, 0.002, D / 2));
       // back main flap: point-symmetric — same geometry, frame turned 180°
-      const backFlap = makeFlap(mainFlapGeometry(), flapMatB, Math.PI, new THREE.Vector3(0, 0.014, -D / 2));
+      const backFlap = makeFlap(twoToneCaps(mainFlapGeometry()), baseFlapMats(), Math.PI, new THREE.Vector3(0, 0.014, -D / 2));
 
-      // white tuck triangles from the side walls (stacked just above)
-      const triMatL = cardMat(plainPanel(512, 300, WHITE, 0.5));
-      const triMatR = cardMat(plainPanel(512, 300, WHITE, 0.5));
-      const leftTri  = makeFlap(tuckTriangleGeometry(), triMatL, -Math.PI / 2, new THREE.Vector3(-W / 2, 0.026, 0));
-      const rightTri = makeFlap(tuckTriangleGeometry(), triMatR,  Math.PI / 2, new THREE.Vector3( W / 2, 0.026, 0));
+      // corner tuck triangles from the side walls (stacked just above) — same navy/white pair
+      const leftTri  = makeFlap(twoToneCaps(tuckTriangleGeometry()), baseFlapMats(), -Math.PI / 2, new THREE.Vector3(-W / 2, 0.026, 0));
+      const rightTri = makeFlap(twoToneCaps(tuckTriangleGeometry()), baseFlapMats(),  Math.PI / 2, new THREE.Vector3( W / 2, 0.026, 0));
 
       /* ---------- NORMAL TOP OPENING: ONE long navy lid hinged at the back
          (the main closure, spans the whole top) + two white tuck flaps from
@@ -491,12 +508,18 @@
         { mesh: backWall,  n: new THREE.Vector3( 0, 0,  1) }
       ];
       baseFlaps.forEach(hinge => hinge.children.forEach(c => {
-        if (c.isMesh && c.material) { c.material.clippingPlanes = clipPlanes; c.material.clipShadows = true; }
+        if (c.isMesh && c.material) (Array.isArray(c.material) ? c.material : [c.material])
+          .forEach(m => { m.clippingPlanes = clipPlanes; m.clipShadows = true; });
       }));
       const triPlanes = [new THREE.Plane(), new THREE.Plane()];
       const navyClip = clipPlanes.concat(triPlanes);
+      // BOTH material slots of the main flaps (navy exterior AND white interior) get the
+      // triangle planes, so the whole main flap is kept below the triangles and nothing
+      // penetrates them — same idea as the wall clips. If only the navy slot got these,
+      // the white interior would poke up through the triangles.
       [frontFlap, backFlap].forEach(hinge => hinge.children.forEach(c => {
-        if (c.isMesh && c.material) c.material.clippingPlanes = navyClip;
+        if (c.isMesh && c.material) (Array.isArray(c.material) ? c.material : [c.material])
+          .forEach(m => m.clippingPlanes = navyClip);
       }));
       const _triFlaps = [leftTri, rightTri];
       const _cq = new THREE.Quaternion(), _cp = new THREE.Vector3(), _cn = new THREE.Vector3();
@@ -552,9 +575,15 @@
         rightPivot.rotation.y = alpha;            // right parallel to left → loop stays closed
         leftWall.position.x  = leftWallX0;
         rightWall.position.x = rightWallX0;
-        boxGroup.position.x = -D * Math.sin(alpha) / 2;  // keep the flattening centred
+        // centre the flattening on the INNER tray (a child of boxGroup) — never on
+        // boxGroup itself: boxGroup is the group that spins, and a position offset on it
+        // is applied AFTER its rotation, which pushes the pivot off-centre so the box
+        // orbits instead of spinning in place. Offsetting the child keeps boxGroup's
+        // origin locked to the box centre, so rotation always turns around the middle.
+        trayGroup.position.x = -D * Math.sin(alpha) / 2;  // keep the flattening centred
         // base flaps fold UP into the box along their creases, in step with the collapse
-        const foldA = 1.55 * bOpen;
+        // the base only folds inward to 85% of full — everything else (walls, top) unchanged
+        const foldA = 1.55 * 0.85 * bOpen;
         frontFlap.rotation.x = foldA;
         backFlap.rotation.x  = foldA;
         leftTri.rotation.x   = foldA;
