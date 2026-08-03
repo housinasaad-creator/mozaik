@@ -194,7 +194,7 @@
     }
     build(); addEventListener("resize", build, { passive: true });
 
-    const CMYK = [[0, 158, 224], [230, 0, 126], [250, 214, 40], [228, 232, 242]]; // C, M, Y, K (K shown light so it reads on dark)
+    const CMYK = [[0, 158, 224], [230, 0, 126], [250, 214, 40], [17, 18, 22]]; // C, M, Y, K (real black; a faint light rim below keeps it visible on the dark bg)
     const GOLD = [214, 182, 110];
 
     const merges = []; let cool = 0, scroll = 0;   // scroll = accumulated downward drift
@@ -228,6 +228,13 @@
         const g = gp[2], b = CMYK[gp[3]];
         const cr = (b[0] + (GOLD[0] - b[0]) * g) | 0, cg = (b[1] + (GOLD[1] - b[1]) * g) | 0, cb = (b[2] + (GOLD[2] - b[2]) * g) | 0;
         const r = 1.4 + g * 3;                                  // smaller, solid dots (no glowing halo)
+        // K ink is near-black and would wash out on the dark bg — draw a faint light rim
+        // (fading to nothing as the dot merges toward gold) so it still reads as a black dot.
+        if (gp[3] === 3 && g < 0.85) {
+          ctx.strokeStyle = "rgba(206,212,224," + (0.55 * (1 - g)).toFixed(3) + ")";
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(gp[0], gp[1], r + 0.7, 0, 6.283); ctx.stroke();
+        }
         ctx.fillStyle = "rgba(" + cr + "," + cg + "," + cb + ",.85)";
         ctx.beginPath(); ctx.arc(gp[0], gp[1], r, 0, 6.283); ctx.fill();
       }
