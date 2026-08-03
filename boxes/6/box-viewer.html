@@ -395,6 +395,31 @@
       let foldTarget = 0, fold = 0;   // start OPEN (standing tray)
       applyFold(fold);
 
+      /* keep the box spinning around its OWN centre while the slider folds it: the folding
+         geometry's horizontal centre drifts as the walls swing, and because boxGroup spins
+         about its origin, that drift makes the whole box swing in a circle. Cancel it by
+         nudging the inner trayGroup so the content's X/Z centre stays fixed (Y left natural). */
+      const _rcBox = new THREE.Box3(), _rcC = new THREE.Vector3();
+      let _rcX0 = 0, _rcZ0 = 0;
+      function _measureCentre() {
+        const rx = boxGroup.rotation.x, ry = boxGroup.rotation.y, rz = boxGroup.rotation.z;
+        const px = trayGroup.position.x, pz = trayGroup.position.z;
+        boxGroup.rotation.set(0, 0, 0);
+        trayGroup.position.x = 0; trayGroup.position.z = 0;
+        boxGroup.updateWorldMatrix(true, true);
+        _rcBox.setFromObject(trayGroup); _rcBox.getCenter(_rcC);
+        boxGroup.rotation.set(rx, ry, rz);
+        trayGroup.position.x = px; trayGroup.position.z = pz;
+      }
+      function recenterFold() {
+        _measureCentre();
+        trayGroup.position.x = _rcX0 - _rcC.x;
+        trayGroup.position.z = _rcZ0 - _rcC.z;
+        boxGroup.updateWorldMatrix(true, true);
+      }
+      _measureCentre(); _rcX0 = _rcC.x; _rcZ0 = _rcC.z;   // reference = assembled/default fold
+      recenterFold();
+
       /* ---------- slider wiring ---------- */
       const foldSlider = document.getElementById("foldSlider");
       const lblOpen = document.getElementById("lblOpen");
@@ -479,12 +504,12 @@
         requestAnimationFrame(animate);
         if (window.__mzkPaused) return;
         if (autoOn && !dragging) { rot.y += 0.003; boxGroup.rotation.y = rot.y; }
-        if (Math.abs(foldTarget - fold) > 0.0005) { fold += (foldTarget - fold) * 0.09; applyFold(fold); }
+        if (Math.abs(foldTarget - fold) > 0.0005) { fold += (foldTarget - fold) * 0.09; applyFold(fold); recenterFold(); }
         renderer.render(scene, camera);
       })();
 
       window.__debug = { THREE, boxGroup, trayGroup, frontWall, backWall, leftWall, rightWall, camera, scene,
-        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); recenterFold(); } };
 
       console.log("✓ four-corner tray ready");
     }

@@ -358,6 +358,11 @@
       }
 
       const boxGroup = new THREE.Group();
+      // inner wrapper for the folding content (base + lid). boxGroup is the group that spins;
+      // offsetting THIS inner group (below) keeps the box's centre on the spin axis so the
+      // lid sliding out to the side doesn't make the whole box swing in a circle.
+      const content = new THREE.Group();
+      boxGroup.add(content);
 
       /* ---------- printed textures ---------- */
       // lid TOP — colored logo on white
@@ -394,7 +399,7 @@
          closed bottom, OPEN top. All exterior edges read navy.
          ========================================================= */
       const base = new THREE.Group();
-      boxGroup.add(base);
+      content.add(base);
 
       (function () { const b = corrugatedBoard(BW, BH, cardMat(baseFrontTex), nMat); b.position.set(0, 0, BD / 2 - TC / 2); base.add(b); })();                        // front (+z)
       (function () { const b = corrugatedBoard(BW, BH, cardMat(baseBackTex),  nMat); b.rotation.y = Math.PI;      b.position.set(0, 0, -BD / 2 + TC / 2); base.add(b); })(); // back (-z)
@@ -454,7 +459,7 @@
          sits OUTSIDE the base walls. Lifted/lowered by the slider.
          ========================================================= */
       const lid = new THREE.Group();
-      boxGroup.add(lid);
+      content.add(lid);
 
       const clr   = 0.012;                       // clearance between lid skirt and base wall
       const LW = BW + 2 * TC + 2 * clr;          // lid outer width
@@ -551,6 +556,31 @@
       }
       applyLift(lift);
 
+      /* keep the box spinning around its OWN centre while the slider opens it: as the lid
+         lifts and slides out to the side, the base+lid horizontal centre drifts, and because
+         boxGroup spins about its origin that drift makes the whole thing swing in a circle.
+         Cancel it by nudging the inner content group so the X/Z centre stays fixed. */
+      const _rcBox = new THREE.Box3(), _rcC = new THREE.Vector3();
+      let _rcX0 = 0, _rcZ0 = 0;
+      function _measureCentre() {
+        const rx = boxGroup.rotation.x, ry = boxGroup.rotation.y, rz = boxGroup.rotation.z;
+        const px = content.position.x, pz = content.position.z;
+        boxGroup.rotation.set(0, 0, 0);
+        content.position.x = 0; content.position.z = 0;
+        boxGroup.updateWorldMatrix(true, true);
+        _rcBox.setFromObject(content); _rcBox.getCenter(_rcC);
+        boxGroup.rotation.set(rx, ry, rz);
+        content.position.x = px; content.position.z = pz;
+      }
+      function recenterLift() {
+        _measureCentre();
+        content.position.x = _rcX0 - _rcC.x;
+        content.position.z = _rcZ0 - _rcC.z;
+        boxGroup.updateWorldMatrix(true, true);
+      }
+      _measureCentre(); _rcX0 = _rcC.x; _rcZ0 = _rcC.z;   // reference = closed/default state
+      recenterLift();
+
       const foldSlider = document.getElementById("foldSlider");
       const lblOpen = document.getElementById("lblOpen");
       const lblClose = document.getElementById("lblClose");
@@ -637,12 +667,13 @@
         if (Math.abs(liftTarget - lift) > 0.0005) {
           lift += (liftTarget - lift) * 0.09;
           applyLift(lift);
+          recenterLift();
         }
         renderer.render(scene, camera);
       })();
 
       window.__debug = { THREE, boxGroup, base, lid, camera, scene,
-        setLift: (t) => { liftTarget = t; lift = t; applyLift(t); } };
+        setLift: (t) => { liftTarget = t; lift = t; applyLift(t); recenterLift(); } };
 
       console.log("✓ Corrugated carry-handle carton ready");
     }

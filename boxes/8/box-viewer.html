@@ -428,6 +428,31 @@
       }
       applyFold(fold);
 
+      /* keep the box spinning around its OWN centre while the slider opens/closes the lid:
+         as the lid swings up & back the geometry's horizontal centre drifts, and because
+         boxGroup spins about its origin that drift makes the whole box swing in a circle.
+         Cancel it by nudging the inner trayGroup so the content's X/Z centre stays fixed. */
+      const _rcBox = new THREE.Box3(), _rcC = new THREE.Vector3();
+      let _rcX0 = 0, _rcZ0 = 0;
+      function _measureCentre() {
+        const rx = boxGroup.rotation.x, ry = boxGroup.rotation.y, rz = boxGroup.rotation.z;
+        const px = trayGroup.position.x, pz = trayGroup.position.z;
+        boxGroup.rotation.set(0, 0, 0);
+        trayGroup.position.x = 0; trayGroup.position.z = 0;
+        boxGroup.updateWorldMatrix(true, true);
+        _rcBox.setFromObject(trayGroup); _rcBox.getCenter(_rcC);
+        boxGroup.rotation.set(rx, ry, rz);
+        trayGroup.position.x = px; trayGroup.position.z = pz;
+      }
+      function recenterFold() {
+        _measureCentre();
+        trayGroup.position.x = _rcX0 - _rcC.x;
+        trayGroup.position.z = _rcZ0 - _rcC.z;
+        boxGroup.updateWorldMatrix(true, true);
+      }
+      _measureCentre(); _rcX0 = _rcC.x; _rcZ0 = _rcC.z;   // reference = assembled/default fold
+      recenterFold();
+
       const foldSlider = document.getElementById("foldSlider");
       const lblOpen = document.getElementById("lblOpen");
       const lblClose = document.getElementById("lblClose");
@@ -514,12 +539,13 @@
         if (Math.abs(foldTarget - fold) > 0.0005) {
           fold += (foldTarget - fold) * 0.09;
           applyFold(fold);
+          recenterFold();
         }
         renderer.render(scene, camera);
       })();
 
       window.__debug = { THREE, boxGroup, trayGroup, lidPivot, camera, scene,
-        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); } };
+        setFold: (t) => { foldTarget = t; fold = t; applyFold(t); recenterFold(); } };
 
       console.log("✓ burger box ready");
     }

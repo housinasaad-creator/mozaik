@@ -52,25 +52,10 @@
       if (window.ResizeObserver) new ResizeObserver(fit).observe(document.body);
       addEventListener("resize", fit);
 
-      /* ---------- environment (soft studio gloss) ---------- */
-      const envC = document.createElement("canvas");
-      envC.width = 512; envC.height = 256;
-      const ex = envC.getContext("2d");
-      const grd = ex.createLinearGradient(0, 0, 0, 256);
-      grd.addColorStop(0, "#ffffff");
-      grd.addColorStop(0.5, "#d7e7f4");
-      grd.addColorStop(0.75, "#88b4d6");
-      grd.addColorStop(1, "#243a56");
-      ex.fillStyle = grd; ex.fillRect(0, 0, 512, 256);
-      ex.fillStyle = "rgba(255,255,255,0.7)";
-      ex.beginPath(); ex.arc(130, 60, 34, 0, 7); ex.fill();
-      ex.beginPath(); ex.arc(360, 70, 42, 0, 7); ex.fill();
-      const envTex = new THREE.CanvasTexture(envC);
-      envTex.mapping = THREE.EquirectangularReflectionMapping;
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      const envRT = pmrem.fromEquirectangular(envTex);
-      scene.environment = envRT.texture;
-      envTex.dispose(); pmrem.dispose();
+      /* ---------- NO environment map ---------- */
+      // A studio env-map reflection is what made the stand read as glossy plastic/epoxy.
+      // Uncoated cardboard is matte, so we light it with plain lights only (below) and
+      // leave scene.environment unset.
 
       /* ---------- lighting ---------- */
       scene.add(new THREE.HemisphereLight(0xffffff, 0x2a3550, 0.55));
@@ -163,15 +148,35 @@
         uv.needsUpdate = true;
       }
 
-      /* ---------- materials ---------- */
-      const matNavy = new THREE.MeshStandardMaterial({ color: NAVY, roughness: 0.55, metalness: 0.12 });
-      const matNavyD = new THREE.MeshStandardMaterial({ color: NAVY_D, roughness: 0.6, metalness: 0.1 });
-      const matNavy2 = new THREE.MeshStandardMaterial({ color: NAVY2, roughness: 0.6, metalness: 0.1 });
-      const matSky = new THREE.MeshStandardMaterial({ color: SKY, roughness: 0.5, metalness: 0.15 });
+      /* ---------- materials (matte, uncoated CARDBOARD — no gloss/metal) ---------- */
+      const CARD_R = 0.96;   // very rough → kills the plastic/epoxy sheen
+      const matNavy = new THREE.MeshStandardMaterial({ color: NAVY, roughness: CARD_R, metalness: 0 });
+      const matNavyD = new THREE.MeshStandardMaterial({ color: NAVY_D, roughness: CARD_R, metalness: 0 });
+      const matNavy2 = new THREE.MeshStandardMaterial({ color: NAVY2, roughness: CARD_R, metalness: 0 });
+      const matSky = new THREE.MeshStandardMaterial({ color: SKY, roughness: 0.9, metalness: 0 });
       // interior surfaces (tray floor + back liner): a lighter navy for subtle depth — NOT white, so nothing pale shows from the front
-      const matLight = new THREE.MeshStandardMaterial({ color: "#2b4c7d", roughness: 0.7, metalness: 0.04, side: THREE.DoubleSide });
-      const fasciaMat = new THREE.MeshStandardMaterial({ map: brandStripTex(1024, 146), roughness: 0.5, metalness: 0.12 });
-      const signMat = new THREE.MeshStandardMaterial({ map: signTex(1024, 326), roughness: 0.5, metalness: 0.12 });
+      const matLight = new THREE.MeshStandardMaterial({ color: "#2b4c7d", roughness: CARD_R, metalness: 0, side: THREE.DoubleSide });
+      const fasciaMat = new THREE.MeshStandardMaterial({ map: brandStripTex(1024, 146), roughness: 0.9, metalness: 0 });
+      const signMat = new THREE.MeshStandardMaterial({ map: signTex(1024, 326), roughness: 0.9, metalness: 0 });
+      // exposed CUT EDGES of the board show kraft-brown corrugated fluting — the strongest
+      // "this is cardboard" cue. Reused on every panel's thickness and on the locking tabs.
+      function kraftFluteTex() {
+        const c = document.createElement("canvas"); c.width = 96; c.height = 24;
+        const x = c.getContext("2d");
+        x.fillStyle = "#c39a63"; x.fillRect(0, 0, 96, 24);             // kraft base
+        for (let i = 0; i < 96; i += 6) {                             // corrugated flutes (ripples)
+          x.fillStyle = ((i / 6) % 2) ? "#b0864f" : "#cea873";
+          x.fillRect(i, 0, 3, 24);
+        }
+        x.fillStyle = "rgba(90,60,30,0.28)"; x.fillRect(0, 0, 96, 3);  // top liner line
+        x.fillRect(0, 21, 96, 3);                                     // bottom liner line
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(8, 1);
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        t.encoding = THREE.sRGBEncoding;
+        return t;
+      }
+      const matEdge = new THREE.MeshStandardMaterial({ map: kraftFluteTex(), color: "#c9a875", roughness: 1, metalness: 0 });
       // face order [+x,-x,+y,-y,+z,-z]; +z (index 4) = FRONT
       const fasciaFaces = [matNavy, matNavy, matNavy, matNavy, fasciaMat, matNavy];
       const signFaces = [matNavy, matNavy, matNavy, matNavy, signMat, matNavy];
@@ -195,7 +200,7 @@
 
       /* ---------- carcass ---------- */
       const backGeo = new THREE.ExtrudeGeometry(roundTopShape(Wx, Hy, rTop), { depth: T, bevelEnabled: false });
-      const backPanel = new THREE.Mesh(backGeo, matNavy);
+      const backPanel = new THREE.Mesh(backGeo, [matNavy, matEdge]);          // navy face + kraft cut edge
       backPanel.position.set(0, 0, -Dz / 2); stand.add(backPanel);            // back panel, curved top
       addBox(innerW - 0.02, topDivY - plinthTop, 0.02, matLight,             // back inner liner (depth pop)
              0, (plinthTop + topDivY) / 2, -Dz / 2 + T + 0.015);
@@ -225,7 +230,7 @@
         t.encoding = THREE.sRGBEncoding;
         return t;
       }
-      const matSide = new THREE.MeshStandardMaterial({ color: 0xffffff, map: mosaicTex(), roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide });
+      const matSide = new THREE.MeshStandardMaterial({ color: 0xffffff, map: mosaicTex(), roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
       const zBackW = -Dz / 2, fDeep = 0.5;
       const sideShape = new THREE.Shape();
       sideShape.moveTo(zBackW, 0);
@@ -234,8 +239,8 @@
       sideShape.closePath();                   // vertical back edge
       const sideGeo = new THREE.ExtrudeGeometry(sideShape, { depth: T, bevelEnabled: false });
       sideGeo.rotateY(-Math.PI / 2);           // profile → world Z, thickness → world X (-T..0)
-      const sideL = new THREE.Mesh(sideGeo, matSide); sideL.position.x = -Wx / 2 + T; stand.add(sideL);
-      const sideR = new THREE.Mesh(sideGeo, matSide); sideR.position.x = Wx / 2; stand.add(sideR);
+      const sideL = new THREE.Mesh(sideGeo, [matSide, matEdge]); sideL.position.x = -Wx / 2 + T; stand.add(sideL);
+      const sideR = new THREE.Mesh(sideGeo, [matSide, matEdge]); sideR.position.x = Wx / 2; stand.add(sideR);
 
       /* ---------- side panels carry only the subtle mosaic (no logo) ---------- */
 
@@ -250,11 +255,23 @@
         // branded front lip: a plate whose TOP is curved (matches the drawn outline), square bottom
         const fGeo = new THREE.ExtrudeGeometry(roundTopShape(innerW, fasciaH, fasciaH * 0.5), { depth: T, bevelEnabled: false });
         normUV(fGeo, innerW, fasciaH);
-        const fascia = new THREE.Mesh(fGeo, [fasciaMat, matNavy]);
+        const fascia = new THREE.Mesh(fGeo, [fasciaMat, matEdge]);
         fascia.position.set(0, -0.03, td / 2 - T); g.add(fascia);   // bottom at y=-0.03, front cap at z = td/2
         addBox(innerW, 0.13, T, matNavy2, 0, 0.065, -td / 2 + T / 2, g);      // back lip
         addBox(T, 0.15, td, matNavy2, -innerW / 2 + T / 2, 0.075, 0, g);      // left lip
         addBox(T, 0.15, td, matNavy2, innerW / 2 - T / 2, 0.075, 0, g);       // right lip
+        // LOCKING TABS: each shelf edge extends into a tab that slots THROUGH the side
+        // wall and pokes out the other side — the tell-tale corrugated-cardboard assembly.
+        // Kraft-brown like the cut edges. Two tabs per side (front + back of the shelf).
+        const tabW = T + 0.085;                         // spans the wall thickness (T) + protrudes ~0.07 outside
+        const tabCx = innerW / 2 - 0.02 + tabW / 2;     // inner end embedded ~0.02 into the shelf, outer end past the wall
+        [-1, 1].forEach(function (sx) {
+          [-td * 0.26, td * 0.20].forEach(function (tz) {
+            const tab = new THREE.Mesh(new THREE.BoxGeometry(tabW, 0.05, 0.16), matEdge);
+            tab.position.set(sx * tabCx, -T / 2, tz);
+            g.add(tab);
+          });
+        });
         return g;
       }
       /* ---------- illustrative products (semi-transparent) — "the stand fits anything" ---------- */
@@ -346,7 +363,7 @@
       /* ---------- header: Mozaik logo, flat on the back wall, curved top corners ---------- */
       const signGeo = new THREE.ExtrudeGeometry(roundTopShape(innerW, headerH, 0.12), { depth: 0.02, bevelEnabled: false });
       normUV(signGeo, innerW, headerH);
-      const sign = new THREE.Mesh(signGeo, [signMat, matNavy]);
+      const sign = new THREE.Mesh(signGeo, [signMat, matEdge]);
       sign.position.set(0, topDivY, -Dz / 2 + T + 0.011); stand.add(sign);
 
       /* ---------- centre + rotate group ---------- */
