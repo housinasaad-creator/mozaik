@@ -40,10 +40,8 @@
     ]
   }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=51" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="css/style.css?v=53" />
 </head>
 <body class="page-prod">
 
@@ -92,6 +90,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
           </a>
         </div>
+        <button type="button" class="btn btn--cta" data-quote-open data-magnetic data-cursor="cta" data-i18n="nav.cta">Teklif Al</button>
         <div class="lang lang--inline" id="lang" role="group" aria-label="Language">
           <button type="button" data-lang="tr" data-cursor="link">TR</button>
           <button type="button" data-lang="en" data-cursor="link">EN</button>
@@ -109,7 +108,7 @@
       <div class="prodwrap">
         <div class="section-head reveal">
           <span class="kicker" data-i18n="production.kicker">Üretim Hattı</span>
-          <h1 class="section-title" data-i18n-html="production.title">Our advanced <span class="grad">production line</span></h1>
+          <h1 class="section-title" data-i18n-html="production.title">Üretim <span class="grad">hattımız</span></h1>
           <p class="section-sub" data-i18n="production.sub">From prepress to loading — every step under an expert's eye.</p>
         </div>
         <div class="timeline reveal">
@@ -117,10 +116,10 @@
         </div>
         <div class="cta-band__inner glass reveal" style="margin-top:4.6rem">
           <div>
-            <h2 data-i18n-html="ctaband.title">Get a <span class="grad">tailored quote</span> for your project</h2>
-            <p data-i18n="ctaband.sub">Share dimensions and quantity; we'll price it fast.</p>
+            <h2 data-i18n-html="ctaband.title">Projeniz için <span class="grad">özel teklif</span> alın</h2>
+            <p data-i18n="ctaband.sub">Ölçü ve adediyle paylaşın; en kısa sürede fiyatlandıralım.</p>
           </div>
-          <button type="button" class="btn btn--cta btn--lg" data-quote-open data-magnetic data-cursor="cta" data-i18n="cta.quote">Get a Quote</button>
+          <button type="button" class="btn btn--cta btn--lg" data-quote-open data-magnetic data-cursor="cta" data-i18n="cta.quote">Teklif Al</button>
         </div>
         <div class="prodline__back reveal">
           <a href="index.html" class="btn btn--cta btn--lg" data-magnetic data-cursor="cta" data-i18n="production.back">Ana Sayfaya Dön</a>
@@ -168,40 +167,40 @@
     <div class="modal__backdrop" data-quote-close></div>
     <div class="modal__box glass" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
       <button class="modal__close" type="button" data-quote-close aria-label="Close">&times;</button>
-      <span class="kicker" data-i18n="quote.kicker">Get a Quote</span>
-      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Request a quote</h3>
-      <p class="modal__sub" data-i18n="quote.sub">Share a few details and we'll reply fast on WhatsApp.</p>
+      <span class="kicker" data-i18n="quote.kicker">Teklif Al</span>
+      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Teklif isteyin</h3>
+      <p class="modal__sub" data-i18n="quote.sub">Birkaç bilgi paylaşın, WhatsApp'tan hızlıca yanıtlayalım.</p>
       <form id="quoteForm" class="qform">
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.name">Name</span><input type="text" name="name" required /></label>
-          <label class="qform__field"><span data-i18n="quote.company">Company (optional)</span><input type="text" name="company" /></label>
+          <label class="qform__field"><span data-i18n="quote.name">Ad</span><input type="text" name="name" required /></label>
+          <label class="qform__field"><span data-i18n="quote.company">Firma (opsiyonel)</span><input type="text" name="company" /></label>
         </div>
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.phone">Phone (optional)</span><input type="text" name="phone" /></label>
-          <label class="qform__field"><span data-i18n="quote.ptype">Product type</span>
+          <label class="qform__field"><span data-i18n="quote.phone">Telefon (opsiyonel)</span><input type="text" name="phone" /></label>
+          <label class="qform__field"><span data-i18n="quote.ptype">Ürün türü</span>
             <select name="ptype">
-              <option data-i18n="quote.opt.folding">Folding carton</option>
-              <option data-i18n="quote.opt.corrugated">Corrugated box</option>
-              <option data-i18n="quote.opt.rigid">Rigid / telescope box</option>
-              <option data-i18n="quote.opt.window">Window box</option>
-              <option data-i18n="quote.opt.label">Label</option>
-              <option data-i18n="quote.opt.finish">Finishing (UV / foil)</option>
-              <option data-i18n="quote.opt.other">Other</option>
+              <option data-i18n="quote.opt.folding">Katlanır karton</option>
+              <option data-i18n="quote.opt.corrugated">Oluklu kutu</option>
+              <option data-i18n="quote.opt.rigid">Sert / teleskop kutu</option>
+              <option data-i18n="quote.opt.window">Pencereli kutu</option>
+              <option data-i18n="quote.opt.label">Etiket</option>
+              <option data-i18n="quote.opt.finish">Son işlem (UV / yaldız)</option>
+              <option data-i18n="quote.opt.other">Diğer</option>
             </select>
           </label>
         </div>
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.dims">Dimensions</span><input type="text" name="dims" placeholder="L × W × H" /></label>
-          <label class="qform__field"><span data-i18n="quote.qty">Quantity</span><input type="text" name="qty" inputmode="numeric" /></label>
+          <label class="qform__field"><span data-i18n="quote.dims">Ölçüler</span><input type="text" name="dims" placeholder="L × W × H" /></label>
+          <label class="qform__field"><span data-i18n="quote.qty">Adet</span><input type="text" name="qty" inputmode="numeric" /></label>
         </div>
-        <label class="qform__field"><span data-i18n="quote.notes">Notes</span><textarea name="notes" rows="3"></textarea></label>
-        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">Send on WhatsApp</button>
+        <label class="qform__field"><span data-i18n="quote.notes">Notlar</span><textarea name="notes" rows="3"></textarea></label>
+        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">WhatsApp'tan gönder</button>
       </form>
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/vendor/gsap.min.js"></script>
+  <script src="js/vendor/ScrollTrigger.min.js"></script>
   <script src="js/i18n.js?v=26"></script>
   <script src="js/main.js?v=27"></script>
 </body>

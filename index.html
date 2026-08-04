@@ -118,11 +118,9 @@
     ]
   }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/style.css?v=51" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="css/vendor/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css?v=53" />
   <script>
     /* Capability probe — runs before first paint. Flags genuinely weak devices (few cores /
        low memory / reduced-motion) with html.lite so heavy effects (mosaic spotlight, animated
@@ -184,6 +182,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
           </a>
         </div>
+        <button type="button" class="btn btn--cta" data-quote-open data-magnetic data-cursor="cta" data-i18n="nav.cta">Teklif Al</button>
         <div class="lang lang--inline" id="lang" role="group" aria-label="Language">
           <button type="button" data-lang="tr" data-cursor="link">TR</button>
           <button type="button" data-lang="en" data-cursor="link">EN</button>
@@ -245,16 +244,16 @@
             ambalaj ihtiyaçlarına yüksek kaliteli çözümler sunuyoruz.
           </p>
           <p data-i18n-html="about.body2">
-            From concept and structural design to printing, die-cutting and finishing, everything
-            happens under one roof — giving you tighter control, faster turnaround and consistent
-            quality on every run.
+            Konsept ve yapısal tasarımdan baskı, biçak ve son işleme kadar her şey tek çatı
+            altında gerçekleşir; bu da size küçük ya da büyük her siparişte daha sıkı kontrol,
+            daha hızlı teslimat ve tutarlı kalite sağlar.
           </p>
           <ul class="checks">
             <li data-i18n="about.c1">Hassas renk yönetimi ve baskı kalitesi</li>
             <li data-i18n="about.c2">Kısa üretim süreleri, zamanında teslimat</li>
             <li data-i18n="about.c3">Özel tasarım kutu ve ambalaj mühendisliği</li>
-            <li data-i18n="about.c4">Food-safe, BRC-certified production</li>
-            <li data-i18n="about.c5">Free technical consultation before printing</li>
+            <li data-i18n="about.c4">Gıdaya uygun, BRC sertifikalı üretim</li>
+            <li data-i18n="about.c5">Baskı öncesi ücretsiz teknik danışmanlık</li>
           </ul>
         </div>
       </div>
@@ -278,8 +277,8 @@
               <header class="pcard__head">
                 <span class="pcard__num">01</span>
                 <div class="pcard__titles">
-                  <h3 data-i18n="box3.t">One-Point Side-Glued Folding Carton</h3>
-                  <p data-i18n="box3.d">A straight-line carton bonded along a single side seam — the most common tuck-end box.</p>
+                  <h3 data-i18n="box3.t">Tek Noktadan Yandan Yapıştırmalı Katlanır Karton</h3>
+                  <p data-i18n="box3.d">Tek yan dikişten yapıştırılan düz hatlı kutu — en yaygın kilitli kutu tipi.</p>
                 </div>
               </header>
               <div class="pcard__media">
@@ -295,8 +294,8 @@
               <header class="pcard__head">
                 <span class="pcard__num">02</span>
                 <div class="pcard__titles">
-                  <h3 data-i18n="box7.t">Six-Corner Glued Folding Carton</h3>
-                  <p data-i18n="box7.d">A deeper, sturdier tray built with six-corner gluing — holds heavier contents and stacks well.</p>
+                  <h3 data-i18n="box7.t">Altı Köşe Yapıştırmalı Katlanır Karton</h3>
+                  <p data-i18n="box7.d">Daha derin ve sağlam tepsiler, ağır içerik için altı köşe yapıştırmalı yapı.</p>
                 </div>
               </header>
               <div class="pcard__media">
@@ -312,8 +311,8 @@
               <header class="pcard__head">
                 <span class="pcard__num">03</span>
                 <div class="pcard__titles">
-                  <h3 data-i18n="box8.t">Eight-Corner Glued Carton</h3>
-                  <p data-i18n="box8.d">A reinforced eight-corner box engineered for maximum rigidity and a premium presentation.</p>
+                  <h3 data-i18n="box8.t">Sekiz Köşe Yapıştırmalı Karton</h3>
+                  <p data-i18n="box8.d">Maksimum sağlamlık ve premium sunum için sekiz köşe takviyeli kutu.</p>
                 </div>
               </header>
               <div class="pcard__media">
@@ -329,8 +328,8 @@
               <header class="pcard__head">
                 <span class="pcard__num">04</span>
                 <div class="pcard__titles">
-                  <h3 data-i18n="box14.t">Spot UV Boxes</h3>
-                  <p data-i18n="box14.d">Selective high-gloss UV over a matte surface — logos catch the light with a premium feel.</p>
+                  <h3 data-i18n="box14.t">Spot UV (Lokal Vernik) Kutular</h3>
+                  <p data-i18n="box14.d">Mat üzerine seçili parlak UV kaplama — dokunsal kontrast ve premium yüzey.</p>
                 </div>
               </header>
               <div class="pcard__media">
@@ -346,8 +345,8 @@
               <header class="pcard__head">
                 <span class="pcard__num">05</span>
                 <div class="pcard__titles">
-                  <h3 data-i18n="box10.t">Slotter Containers</h3>
-                  <p data-i18n="box10.d">Standard slotted corrugated containers (RSC) — the backbone of shipping and transit packaging.</p>
+                  <h3 data-i18n="box10.t">Slotter Kutular (Oluklu Mukavva)</h3>
+                  <p data-i18n="box10.d">Standart oluklu mukavva kutular — sevkiyatın klasik taşıyıcısı (RSC).</p>
                 </div>
               </header>
               <div class="pcard__media">
@@ -375,7 +374,7 @@
         </div>
       </div>
       <div class="container products-more">
-        <a href="catalog.html" class="btn btn--cta btn--lg" data-magnetic data-cursor="cta" data-i18n="products.viewall">View the catalogue</a>
+        <a href="catalog.html" class="btn btn--cta btn--lg" data-magnetic data-cursor="cta" data-i18n="products.viewall">Kataloğu görüntüle</a>
       </div>
     </section>
 
@@ -425,7 +424,7 @@
             <span class="cert__preview"><img src="assets/certs/iso9001.jpg" alt="ISO 9001 Quality Management certificate" loading="lazy" /></span>
           </li>
         </ul>
-        <p class="section-note reveal" data-i18n="quality.note">From selecting food-contact materials to printing and finishing, we uphold international safety standards at every step — so your packaging reaches the consumer with full confidence. All our inks and coatings are low-migration and food-contact safe.</p>
+        <p class="section-note reveal" data-i18n="quality.note">Kalite bizim için bir slogan değil, bir sistemdir; gıdayla temas eden hammadde seçiminden başlar, renk yönetimi, baskı, son işlem ve paketlemeye kadar sürer. Her adımda uluslararası güvenlik standartlarına bağlıyız ve tüm mürekkep ile laklarımız düşük göçlü, gıdayla temasa uygundur — ürünleriniz tüketiciye tam güvenle ulaşsın ve markanızın itibarını korusun.</p>
       </div>
     </section>
 
@@ -446,7 +445,7 @@
           <div class="card glass reveal" data-tilt data-cursor="link"><div class="card__ico">▲</div>
             <h3 data-i18n="s4.t">Lojistik & Teslimat</h3><p data-i18n="s4.d">Planlı üretim ve güvenli, zamanında sevkiyat.</p><span class="card__preview"><img src="assets/services/logistics.jpg" alt="Logistics & Delivery (sample)" loading="lazy" /></span></div>
         </div>
-        <p class="section-note reveal" data-i18n="services.note">We don't just fulfill the order — we sit with each client to understand the challenge: shipping cost, packaging strength, or speeding up production, and propose the best solution. Many clients have saved time and money thanks to a simple technical consultation before printing.</p>
+        <p class="section-note reveal" data-i18n="services.note">Siparişi olduğu gibi üretmekle yetinmiyoruz; her müşteriyle oturup gerçek zorluğu anlıyoruz — nakliye maliyeti, ambalaj dayanımı, üretim hızı ya da ürünün rafta duruşu — ve hem teknik hem ticari en uygun çözümü öneriyoruz. Birçok müşterimiz, baskı öncesi küçük bir teknik danışmanlıkla zamandan ve paradan tasarruf etti; bir ambalaj sorununu rekabet avantajına dönüştürdü. Uzmanlığımız, fikirden teslimata kadar yanınızda.</p>
       </div>
     </section>
 
@@ -465,7 +464,7 @@
           <li class="client glass reveal" data-tilt data-cursor="link" aria-label="Verdé"><svg viewBox="0 0 210 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polygon points="28,7 45,17 45,43 28,53 11,43 11,17" fill="#3fae54"/><path d="M21 30 27 36 36 23" stroke="#0a1530" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="56" y="39" font-family="Sora,system-ui,sans-serif" font-weight="700" font-size="23" letter-spacing="1" fill="#f0ede4">Verd&#233;</text></svg></li>
           <li class="client glass reveal" data-tilt data-cursor="link" aria-label="Lumen"><svg viewBox="0 0 210 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="28" cy="30" r="11" fill="#f5a623"/><g stroke="#f5a623" stroke-width="3" stroke-linecap="round"><line x1="28" y1="6" x2="28" y2="13"/><line x1="28" y1="47" x2="28" y2="54"/><line x1="4" y1="30" x2="11" y2="30"/><line x1="45" y1="30" x2="52" y2="30"/><line x1="11" y1="13" x2="16" y2="18"/><line x1="40" y1="42" x2="45" y2="47"/><line x1="45" y1="13" x2="40" y2="18"/><line x1="16" y1="42" x2="11" y2="47"/></g><text x="60" y="39" font-family="Sora,system-ui,sans-serif" font-weight="700" font-size="23" letter-spacing="1" fill="#f0ede4">Lumen</text></svg></li>
         </ul>
-        <p class="section-note reveal" data-i18n="clients.note">From startups to global brands, our clients choose Mozaik because they want a partner who understands that packaging is the first touch between their product and the customer. We work as an extension of their team — meeting deadlines, protecting quality, and keeping every design confidential. We don't measure our relationships by the number of orders, but by the trust that grows with each project — and that is what we are proudest of.</p>
+        <p class="section-note reveal" data-i18n="clients.note">Yeni girişimlerden küresel markalara kadar müşterilerimiz Mozaik'i seçiyor; çünkü ambalajın, ürünleri ile müşteri arasındaki ilk temas olduğunu bilen bir ortak arıyorlar. Ekiplerinin bir uzantısı gibi çalışıyoruz: teslim tarihlerine bağlı kalıyor, kalitelerini koruyor ve her tasarımı gizli tutuyoruz. İlişkilerimizi sipariş sayısıyla değil, her projeyle büyüyen güvenle ölçüyoruz — ve en çok gurur duyduğumuz şey de budur.</p>
       </div>
     </section>
 
@@ -477,7 +476,7 @@
           <p class="section-sub" data-i18n="location.sub">Mozaik Ofset ve Ambalaj — Gaziantep'te üretim tesisimiz.</p>
         </div>
 
-        <p class="section-note reveal" data-i18n-html="location.note">Our door is always open — whether you have a ready design or just a question. Call us or reach out on WhatsApp, tell us about your product, its size and quantity, and our technical team will give you a <strong>free consultation</strong> and the best-fit solution before you start.</p>
+        <p class="section-note reveal" data-i18n-html="location.note">Kapımız her zaman açık — hazır bir tasarımınız olsa da olmasa da. Bizi arayın ya da WhatsApp'tan yazın; ürününüzü, ölçüsünü ve adedini paylaşın, teknik ekibimiz başlamadan önce size <strong>ücretsiz danışmanlık</strong> ve en uygun çözümü sunsun. Hızlı bir ilk yanıt ve kendini kanıtlayan bir numune sizi bekliyor.</p>
 
         <div class="location__grid">
           <div class="location__map glass reveal">
@@ -569,41 +568,41 @@
     <div class="modal__backdrop" data-quote-close></div>
     <div class="modal__box glass" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
       <button class="modal__close" type="button" data-quote-close aria-label="Close">&times;</button>
-      <span class="kicker" data-i18n="quote.kicker">Get a Quote</span>
-      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Request a quote</h3>
-      <p class="modal__sub" data-i18n="quote.sub">Share a few details and we'll reply fast on WhatsApp.</p>
+      <span class="kicker" data-i18n="quote.kicker">Teklif Al</span>
+      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Teklif isteyin</h3>
+      <p class="modal__sub" data-i18n="quote.sub">Birkaç bilgi paylaşın, WhatsApp'tan hızlıca yanıtlayalım.</p>
       <form id="quoteForm" class="qform">
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.name">Name</span><input type="text" name="name" required /></label>
-          <label class="qform__field"><span data-i18n="quote.company">Company (optional)</span><input type="text" name="company" /></label>
+          <label class="qform__field"><span data-i18n="quote.name">Ad</span><input type="text" name="name" required /></label>
+          <label class="qform__field"><span data-i18n="quote.company">Firma (opsiyonel)</span><input type="text" name="company" /></label>
         </div>
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.phone">Phone (optional)</span><input type="text" name="phone" /></label>
-          <label class="qform__field"><span data-i18n="quote.ptype">Product type</span>
+          <label class="qform__field"><span data-i18n="quote.phone">Telefon (opsiyonel)</span><input type="text" name="phone" /></label>
+          <label class="qform__field"><span data-i18n="quote.ptype">Ürün türü</span>
             <select name="ptype">
-              <option data-i18n="quote.opt.folding">Folding carton</option>
-              <option data-i18n="quote.opt.corrugated">Corrugated box</option>
-              <option data-i18n="quote.opt.rigid">Rigid / telescope box</option>
-              <option data-i18n="quote.opt.window">Window box</option>
-              <option data-i18n="quote.opt.label">Label</option>
-              <option data-i18n="quote.opt.finish">Finishing (UV / foil)</option>
-              <option data-i18n="quote.opt.other">Other</option>
+              <option data-i18n="quote.opt.folding">Katlanır karton</option>
+              <option data-i18n="quote.opt.corrugated">Oluklu kutu</option>
+              <option data-i18n="quote.opt.rigid">Sert / teleskop kutu</option>
+              <option data-i18n="quote.opt.window">Pencereli kutu</option>
+              <option data-i18n="quote.opt.label">Etiket</option>
+              <option data-i18n="quote.opt.finish">Son işlem (UV / yaldız)</option>
+              <option data-i18n="quote.opt.other">Diğer</option>
             </select>
           </label>
         </div>
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.dims">Dimensions</span><input type="text" name="dims" placeholder="L × W × H" /></label>
-          <label class="qform__field"><span data-i18n="quote.qty">Quantity</span><input type="text" name="qty" inputmode="numeric" /></label>
+          <label class="qform__field"><span data-i18n="quote.dims">Ölçüler</span><input type="text" name="dims" placeholder="L × W × H" /></label>
+          <label class="qform__field"><span data-i18n="quote.qty">Adet</span><input type="text" name="qty" inputmode="numeric" /></label>
         </div>
-        <label class="qform__field"><span data-i18n="quote.notes">Notes</span><textarea name="notes" rows="3"></textarea></label>
-        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">Send on WhatsApp</button>
+        <label class="qform__field"><span data-i18n="quote.notes">Notlar</span><textarea name="notes" rows="3"></textarea></label>
+        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">WhatsApp'tan gönder</button>
       </form>
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/vendor/gsap.min.js"></script>
+  <script src="js/vendor/ScrollTrigger.min.js"></script>
+  <script src="js/vendor/leaflet.js"></script>
   <script src="js/i18n.js?v=26"></script>
   <script src="js/main.js?v=27"></script>
 </body>

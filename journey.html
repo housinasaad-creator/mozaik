@@ -40,10 +40,8 @@
     ]
   }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=51" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="css/style.css?v=54" />
 </head>
 <body class="jpage">
 
@@ -54,7 +52,7 @@
   <!-- Full-page hero video (autoplay, same as homepage hero) -->
   <div class="jpage-bg" aria-hidden="true">
     <video id="jVideo" autoplay muted loop playsinline preload="auto" poster="assets/hero-poster.jpg">
-      <source src="assets/hero.mp4" type="video/mp4" />
+      <source type="video/mp4" />
     </video>
     <div class="jpage-veil"></div>
   </div>
@@ -95,6 +93,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
           </a>
         </div>
+        <button type="button" class="btn btn--cta" data-quote-open data-magnetic data-cursor="cta" data-i18n="nav.cta">Teklif Al</button>
         <div class="lang lang--inline" id="lang" role="group" aria-label="Language">
           <button type="button" data-lang="tr" data-cursor="link">TR</button>
           <button type="button" data-lang="en" data-cursor="link">EN</button>
@@ -126,7 +125,7 @@
     <div class="jwheel-measure" id="jWheelMeasure" aria-hidden="true"></div>
 
     <div class="jpage-actions">
-      <button type="button" class="btn btn--cta" data-quote-open data-magnetic data-cursor="cta" data-i18n="cta.quote">Get a Quote</button>
+      <button type="button" class="btn btn--cta" data-quote-open data-magnetic data-cursor="cta" data-i18n="cta.quote">Teklif Al</button>
       <a href="index.html" class="btn btn--ghost" data-magnetic data-cursor="link" data-i18n="journey.back">Ana Sayfaya Dön</a>
       <a href="catalog.html" class="btn btn--ghost" data-magnetic data-cursor="link" data-i18n="cta.catalog">Katalog</a>
     </div>
@@ -170,40 +169,40 @@
     <div class="modal__backdrop" data-quote-close></div>
     <div class="modal__box glass" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
       <button class="modal__close" type="button" data-quote-close aria-label="Close">&times;</button>
-      <span class="kicker" data-i18n="quote.kicker">Get a Quote</span>
-      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Request a quote</h3>
-      <p class="modal__sub" data-i18n="quote.sub">Share a few details and we'll reply fast on WhatsApp.</p>
+      <span class="kicker" data-i18n="quote.kicker">Teklif Al</span>
+      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Teklif isteyin</h3>
+      <p class="modal__sub" data-i18n="quote.sub">Birkaç bilgi paylaşın, WhatsApp'tan hızlıca yanıtlayalım.</p>
       <form id="quoteForm" class="qform">
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.name">Name</span><input type="text" name="name" required /></label>
-          <label class="qform__field"><span data-i18n="quote.company">Company (optional)</span><input type="text" name="company" /></label>
+          <label class="qform__field"><span data-i18n="quote.name">Ad</span><input type="text" name="name" required /></label>
+          <label class="qform__field"><span data-i18n="quote.company">Firma (opsiyonel)</span><input type="text" name="company" /></label>
         </div>
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.phone">Phone (optional)</span><input type="text" name="phone" /></label>
-          <label class="qform__field"><span data-i18n="quote.ptype">Product type</span>
+          <label class="qform__field"><span data-i18n="quote.phone">Telefon (opsiyonel)</span><input type="text" name="phone" /></label>
+          <label class="qform__field"><span data-i18n="quote.ptype">Ürün türü</span>
             <select name="ptype">
-              <option data-i18n="quote.opt.folding">Folding carton</option>
-              <option data-i18n="quote.opt.corrugated">Corrugated box</option>
-              <option data-i18n="quote.opt.rigid">Rigid / telescope box</option>
-              <option data-i18n="quote.opt.window">Window box</option>
-              <option data-i18n="quote.opt.label">Label</option>
-              <option data-i18n="quote.opt.finish">Finishing (UV / foil)</option>
-              <option data-i18n="quote.opt.other">Other</option>
+              <option data-i18n="quote.opt.folding">Katlanır karton</option>
+              <option data-i18n="quote.opt.corrugated">Oluklu kutu</option>
+              <option data-i18n="quote.opt.rigid">Sert / teleskop kutu</option>
+              <option data-i18n="quote.opt.window">Pencereli kutu</option>
+              <option data-i18n="quote.opt.label">Etiket</option>
+              <option data-i18n="quote.opt.finish">Son işlem (UV / yaldız)</option>
+              <option data-i18n="quote.opt.other">Diğer</option>
             </select>
           </label>
         </div>
         <div class="qform__row">
-          <label class="qform__field"><span data-i18n="quote.dims">Dimensions</span><input type="text" name="dims" placeholder="L × W × H" /></label>
-          <label class="qform__field"><span data-i18n="quote.qty">Quantity</span><input type="text" name="qty" inputmode="numeric" /></label>
+          <label class="qform__field"><span data-i18n="quote.dims">Ölçüler</span><input type="text" name="dims" placeholder="L × W × H" /></label>
+          <label class="qform__field"><span data-i18n="quote.qty">Adet</span><input type="text" name="qty" inputmode="numeric" /></label>
         </div>
-        <label class="qform__field"><span data-i18n="quote.notes">Notes</span><textarea name="notes" rows="3"></textarea></label>
-        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">Send on WhatsApp</button>
+        <label class="qform__field"><span data-i18n="quote.notes">Notlar</span><textarea name="notes" rows="3"></textarea></label>
+        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">WhatsApp'tan gönder</button>
       </form>
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/vendor/gsap.min.js"></script>
+  <script src="js/vendor/ScrollTrigger.min.js"></script>
   <script src="js/i18n.js?v=26"></script>
   <script src="js/main.js?v=27"></script>
   <script>
@@ -213,9 +212,17 @@
       const $$ = (s, c = document) => [...c.querySelectorAll(s)];
       const WHEEL_ANGLE = 12;
       const WHEEL_VISIBLE = 7;
+      const WHEEL_VISIBLE_MOBILE = 4;
       let wheelCards = [];
       let wheelRadius = 260;
       let raf = 0;
+
+      /* Phones/weak devices: the 3D rotateX + blur() wheel is GPU-heavy when recomputed every
+         scroll frame — it's the #1 cause of scroll lag on mid/low-end phones. Below the same
+         860px breakpoint the CSS already uses for the mobile layout (and on devices the site's
+         own weak-device probe already flagged "lite"), swap to a cheap translate+opacity-only
+         reveal with no 3D perspective and no blur — same story, near-zero compositing cost. */
+      let isMobile = matchMedia("(max-width:860px)").matches || document.documentElement.classList.contains("lite");
 
       const src = document.getElementById("jTextSrc");
       const scene = document.getElementById("jWheelScene");
@@ -317,11 +324,12 @@
         const maxScroll = Math.max(1, spacer.offsetHeight - innerHeight);
         const progress = Math.max(0, Math.min(1, scrollY / maxScroll));
         const cursor = progress * (n - 1);
+        const visible = isMobile ? WHEEL_VISIBLE_MOBILE : WHEEL_VISIBLE;
 
         wheelCards.forEach((card, i) => {
           const delta = i - cursor;
           const abs = Math.abs(delta);
-          if (abs > WHEEL_VISIBLE + 0.6) {
+          if (abs > visible + 0.6) {
             card.style.opacity = "0";
             const hide = "translate(-50%, -50%) scale(0.5)";
             card.style.webkitTransform = hide;
@@ -329,10 +337,24 @@
             card.style.filter = "none";
             return;
           }
+          const opacity = Math.max(0, 1 - abs / (visible + 0.35));
+
+          if (isMobile) {
+            // Cheap path: translate + scale + opacity only — no 3D perspective, no blur.
+            const y = delta * 30;
+            const scale = 0.88 + opacity * 0.12;
+            const tf = "translate(-50%, calc(-50% + " + y.toFixed(1) + "px)) scale(" + scale.toFixed(3) + ")";
+            card.style.webkitTransform = tf;
+            card.style.transform = tf;
+            card.style.opacity = opacity.toFixed(3);
+            card.style.zIndex = String(Math.round(1000 - abs * 10));
+            card.style.filter = "none";
+            return;
+          }
+
           const angle = delta * WHEEL_ANGLE;
           const rad = (angle * Math.PI) / 180;
           const z = Math.cos(rad) * wheelRadius;
-          const opacity = Math.max(0, 1 - abs / (WHEEL_VISIBLE + 0.35));
           const scale = 0.82 + opacity * 0.18;
           const tf =
             "translate(-50%, -50%) rotateX(" + (-angle).toFixed(2) +
@@ -354,9 +376,14 @@
       }
 
       /* ---- hero video ---- */
+      // Same light 640p clip the homepage hero serves on phones (perf) — set before load so
+      // the heavy 1080p file is never fetched on mobile, which is already competing with the wheel.
       const v = document.getElementById("jVideo");
       if (v) {
+        const src = v.querySelector("source");
+        if (src) src.src = isMobile ? "assets/hero-mobile.mp4" : "assets/hero.mp4";
         v.muted = true; v.defaultMuted = true;
+        v.load();
         const tryPlay = () => { const p = v.play(); if (p) p.catch(() => {}); };
         tryPlay();
         v.addEventListener("canplay", tryPlay, { once: true });
@@ -369,7 +396,10 @@
       let rT = null;
       addEventListener("resize", () => {
         clearTimeout(rT);
-        rT = setTimeout(buildWheel, 220);
+        rT = setTimeout(() => {
+          isMobile = matchMedia("(max-width:860px)").matches || document.documentElement.classList.contains("lite");
+          buildWheel();
+        }, 220);
       });
       document.addEventListener("mozaik:lang", () => {
         scrollTo(0, 0);

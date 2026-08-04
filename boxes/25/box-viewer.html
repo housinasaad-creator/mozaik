@@ -482,6 +482,29 @@
         dist = Math.max(2.8, Math.min(12, dist + e.deltaY * 0.004));
       }, { passive: true });
 
+      /* ---- pinch-to-zoom (2-finger touch) — single-finger drag-to-rotate above already
+         works via Pointer Events, this only adds the missing mobile zoom gesture ---- */
+      let pinchDist = 0;
+      const touchDist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      renderer.domElement.addEventListener("touchstart", function (e) {
+        if (e.touches.length === 2) {
+          dragging = false;
+          document.body.classList.remove("grabbing");
+          pinchDist = touchDist(e.touches[0], e.touches[1]);
+        }
+      }, { passive: true });
+      renderer.domElement.addEventListener("touchmove", function (e) {
+        if (e.touches.length === 2) {
+          e.preventDefault();
+          const d = touchDist(e.touches[0], e.touches[1]);
+          if (pinchDist > 0) dist = Math.max(2.8, Math.min(12, dist + (pinchDist - d) * 0.015));
+          pinchDist = d;
+        }
+      }, { passive: false });
+      renderer.domElement.addEventListener("touchend", function (e) {
+        if (e.touches.length < 2) pinchDist = 0;
+      }, { passive: true });
+
       (function frame() {
         if (autoSpin && !dragging) yaw += 0.0042;
         camera.position.set(

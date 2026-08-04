@@ -160,7 +160,7 @@ h1,h2,h3{ font-family:var(--font-head); font-weight:700; line-height:1.08; lette
 .nav{ position:fixed; top:0; inset-inline:0; z-index:50; padding:.9rem 0; transition:padding .3s,background .3s,border-color .3s; border-bottom:1px solid transparent; }
 .nav.is-scrolled{ padding:.45rem 0; background:rgba(10,10,12,.72); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-bottom:1px solid var(--stroke); }
 .nav__inner{ display:flex; align-items:center; justify-content:space-between; gap:1rem; }
-.brand{ display:flex; align-items:center; gap:.85rem; }
+.brand{ display:flex; align-items:center; gap:.85rem; flex-shrink:0; }
 .brand__mark{ height:58px; width:auto; filter:drop-shadow(0 4px 18px rgba(var(--accent-rgb),.35)); transition:height .3s var(--ease); }
 .nav.is-scrolled .brand__mark{ height:48px; }
 .brand__text{ display:flex; flex-direction:column; line-height:1; }
@@ -171,7 +171,8 @@ html[lang="ar"] .brand__text em{ letter-spacing:.12em; }
 .nav__links a{ font-family:var(--font-head); font-weight:500; font-size:.92rem; color:var(--text-dim); padding:.5rem .95rem; border-radius:999px; white-space:nowrap; transition:color .25s,background .25s,transform .25s var(--ease); }
 .nav__links a:hover{ color:#fff; background:var(--surface-2); transform:translateY(-2px); }
 .nav__links a.is-active{ color:var(--accent-soft); background:rgba(var(--accent-rgb),.14); text-shadow:0 0 16px rgba(var(--accent-rgb),.6); }
-.nav__actions{ display:flex; align-items:center; gap:.7rem; }
+.nav__actions{ display:flex; align-items:center; gap:.7rem; flex-shrink:0; }
+.nav .btn--cta{ padding:.55rem 1.3rem; font-size:.86rem; white-space:nowrap; }
 .nav__social{ display:flex; align-items:center; gap:.3rem; margin-right:.2rem; }
 .nav__social a{ display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:999px; color:var(--text-dim); border:1px solid transparent; transition:color .25s,background .25s,border-color .25s,transform .25s var(--ease),box-shadow .25s; }
 .nav__social a:hover{ color:var(--gold-soft); background:var(--surface-2); border-color:var(--stroke-2); transform:translateY(-3px) scale(1.08); box-shadow:0 6px 18px rgba(0,0,0,.35); }
