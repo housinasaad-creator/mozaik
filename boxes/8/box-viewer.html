@@ -450,7 +450,9 @@
         trayGroup.position.z = _rcZ0 - _rcC.z;
         boxGroup.updateWorldMatrix(true, true);
       }
-      _measureCentre(); _rcX0 = _rcC.x; _rcZ0 = _rcC.z;   // reference = assembled/default fold
+      // reference = the CLOSED pose (naturally centred). The default fold is the lid OPEN,
+      // whose centre sits well behind the axis — anchoring to that would make the box orbit.
+      applyFold(1); _measureCentre(); _rcX0 = _rcC.x; _rcZ0 = _rcC.z; applyFold(fold);
       recenterFold();
 
       const foldSlider = document.getElementById("foldSlider");

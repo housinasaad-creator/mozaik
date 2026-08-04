@@ -176,7 +176,9 @@
         t.encoding = THREE.sRGBEncoding;
         return t;
       }
-      const matEdge = new THREE.MeshStandardMaterial({ map: kraftFluteTex(), color: "#c9a875", roughness: 1, metalness: 0 });
+      const matEdge = new THREE.MeshStandardMaterial({ map: kraftFluteTex(), color: "#ffffff", roughness: 1, metalness: 0 });
+      // plain kraft for the UNPRINTED back of the board — SAME kraft tone as the tabs/edges
+      const matKraftFace = new THREE.MeshStandardMaterial({ color: "#c39a63", roughness: 0.97, metalness: 0 });
       // face order [+x,-x,+y,-y,+z,-z]; +z (index 4) = FRONT
       const fasciaFaces = [matNavy, matNavy, matNavy, matNavy, fasciaMat, matNavy];
       const signFaces = [matNavy, matNavy, matNavy, matNavy, signMat, matNavy];
@@ -200,7 +202,7 @@
 
       /* ---------- carcass ---------- */
       const backGeo = new THREE.ExtrudeGeometry(roundTopShape(Wx, Hy, rTop), { depth: T, bevelEnabled: false });
-      const backPanel = new THREE.Mesh(backGeo, [matNavy, matEdge]);          // navy face + kraft cut edge
+      const backPanel = new THREE.Mesh(backGeo, [matKraftFace, matEdge]);     // kraft-brown back + kraft cut edge
       backPanel.position.set(0, 0, -Dz / 2); stand.add(backPanel);            // back panel, curved top
       addBox(innerW - 0.02, topDivY - plinthTop, 0.02, matLight,             // back inner liner (depth pop)
              0, (plinthTop + topDivY) / 2, -Dz / 2 + T + 0.015);
@@ -247,7 +249,7 @@
       // (no base plinth / toe-kick — the bottom shelf sits at the bottom)
 
       /* ---------- 5 shelf TRAYS (tilted, with lips) ---------- */
-      function makeTray(td) {
+      function makeTray(td, nTabs, zRear, zFront) {
         const g = new THREE.Group();
         addBox(innerW, T, td, matNavy2, 0, -T / 2, 0, g);                     // tray board
         const top = new THREE.Mesh(new THREE.PlaneGeometry(innerW - 0.03, td - 0.11), matLight);
@@ -262,12 +264,20 @@
         addBox(T, 0.15, td, matNavy2, innerW / 2 - T / 2, 0.075, 0, g);       // right lip
         // LOCKING TABS: each shelf edge extends into a tab that slots THROUGH the side
         // wall and pokes out the other side — the tell-tale corrugated-cardboard assembly.
-        // Kraft-brown like the cut edges. Two tabs per side (front + back of the shelf).
-        const tabW = T + 0.085;                         // spans the wall thickness (T) + protrudes ~0.07 outside
-        const tabCx = innerW / 2 - 0.02 + tabW / 2;     // inner end embedded ~0.02 into the shelf, outer end past the wall
+        // Kraft-brown like the cut edges, SAME thickness as the board (T) so they read as the
+        // shelf's own die-cut ears. nTabs per side scales with the shelf (more on the deeper
+        // lower shelves). They stay in the rear part of the shelf, inside the wedge side wall
+        // (its front edge slopes back going up, so a front tab would poke into open air).
+        const tabW = T + 0.0525;                        // spans the wall thickness (T) + protrudes ~0.0325 outside
+        const tabCx = innerW / 2 - 0.02 + tabW / 2;     // inner end embedded into the shelf, outer end past the wall
+        // spread the tabs EVENLY across the shelf's usable depth window [zRear, zFront]
+        // (computed per shelf so they stay inside the wedge side wall), endpoints included.
+        const zs = [];
+        if (nTabs <= 1) { zs.push((zRear + zFront) / 2); }
+        else { for (let k = 0; k < nTabs; k++) zs.push(zRear + (zFront - zRear) * k / (nTabs - 1)); }
         [-1, 1].forEach(function (sx) {
-          [-td * 0.26, td * 0.20].forEach(function (tz) {
-            const tab = new THREE.Mesh(new THREE.BoxGeometry(tabW, 0.05, 0.16), matEdge);
+          zs.forEach(function (tz) {
+            const tab = new THREE.Mesh(new THREE.BoxGeometry(tabW, T, 0.065), matEdge);
             tab.position.set(sx * tabCx, -T / 2, tz);
             g.add(tab);
           });
@@ -351,9 +361,16 @@
       // is a little shallower, its front stepping back — like stairs.
       const zBack = -Dz / 2 + T;
       const tdBottom = 1.05, tdStep = 0.13;
+      const tabCounts = [4, 3, 2, 2, 2];   // per side, bottom(i=0) → top(i=4): more on the deeper lower shelves
       for (let i = 0; i < N; i++) {
         const td = tdBottom - i * tdStep;
-        const t = makeTray(td);
+        // usable local-z window for this shelf's tabs: from near the back to just behind the
+        // wedge side wall's front edge at this shelf height (so the front tab never pokes out).
+        const trayCenterZ = zBack + td / 2;
+        const wallFrontZ = fDeep + (zBackW - fDeep) / (Hy - rTop) * trayY(i);   // stand-z of wall front edge here
+        const zRear = -0.42 * td;
+        const zFront = Math.min(0.40 * td, wallFrontZ - trayCenterZ - 0.06);
+        const t = makeTray(td, tabCounts[i], zRear, zFront);
         t.position.set(0, trayY(i), zBack + td / 2);   // back stays put → front steps back going up
         t.rotation.x = 0.06;                           // gentle forward tilt
         const plan = shelfPlan[i]; if (plan) populate(t, plan.make, plan.n);
