@@ -43,15 +43,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=42" />
+  <link rel="stylesheet" href="css/style.css?v=51" />
 </head>
 <body class="page-prod">
 
-  <!-- Quiet navy + CMYK dots only (no mosaic / spotlight — keeps reading calm) -->
-  <canvas class="dots-fx" aria-hidden="true"></canvas>
-
   <div class="cursor" id="cursorDot" aria-hidden="true"></div>
   <div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+  <!-- Fixed full-screen video background — only the copy scrolls over it -->
+  <div class="prod-bg" aria-hidden="true">
+    <video class="prod-bg__video" autoplay muted loop playsinline preload="auto"
+           poster="assets/hero-production-poster.jpg">
+      <source src="assets/hero-production.mp4" type="video/mp4" />
+    </video>
+    <div class="prod-bg__scrim"></div>
+    <div class="prod-bg__beam"></div>
+  </div>
 
   <!-- Navbar -->
   <header class="nav" id="nav">
@@ -99,7 +106,7 @@
 
   <main>
     <section class="section prodline">
-      <div class="container">
+      <div class="prodwrap">
         <div class="section-head reveal">
           <span class="kicker" data-i18n="production.kicker">Üretim Hattı</span>
           <h1 class="section-title" data-i18n-html="production.title">Our advanced <span class="grad">production line</span></h1>
@@ -107,6 +114,13 @@
         </div>
         <div class="timeline reveal">
           <div class="timeline__flow" data-i18n-html="production.text"></div>
+        </div>
+        <div class="cta-band__inner glass reveal" style="margin-top:4.6rem">
+          <div>
+            <h2 data-i18n-html="ctaband.title">Get a <span class="grad">tailored quote</span> for your project</h2>
+            <p data-i18n="ctaband.sub">Share dimensions and quantity; we'll price it fast.</p>
+          </div>
+          <button type="button" class="btn btn--cta btn--lg" data-quote-open data-magnetic data-cursor="cta" data-i18n="cta.quote">Get a Quote</button>
         </div>
         <div class="prodline__back reveal">
           <a href="index.html" class="btn btn--cta btn--lg" data-magnetic data-cursor="cta" data-i18n="production.back">Ana Sayfaya Dön</a>
@@ -116,37 +130,79 @@
     </section>
   </main>
 
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <img src="assets/mozaik-logo-colored.png" alt="Mozaik Ofset ve Ambalaj" />
+        <div class="footer__brandtxt">
+          <p data-i18n-html="footer.addr">Mozaik Ofset ve Ambalaj San. Tic. Ltd. Şti.<br />Gaziantep · Türkiye</p>
+        </div>
+      </div>
+      <nav class="footer__nav">
+        <a href="index.html#about"    data-i18n="nav.about"    data-cursor="link">Kurumsal</a>
+        <a href="index.html#products" data-i18n="nav.products" data-cursor="link">Ürünler</a>
+        <a href="index.html#quality"  data-i18n="nav.quality"  data-cursor="link">Kalite</a>
+        <a href="index.html#services" data-i18n="nav.services" data-cursor="link">Hizmetler</a>
+        <a href="index.html#location" data-i18n="nav.contact"  data-cursor="link">İletişim</a>
+        <a href="journey.html"    data-i18n="nav.journey"    data-cursor="link">Başarı Yolculuğu</a>
+        <a href="production.html" data-i18n="nav.production" data-cursor="link">Üretim Hattı</a>
+      </nav>
+      <div class="footer__contact" translate="no">
+        <a href="tel:+903425037773" data-cursor="link">☎ +90 342 503 77 73</a>
+        <a href="https://wa.me/905321753400" target="_blank" rel="noopener" data-cursor="link">WhatsApp +90 532 175 34 00</a>
+        <a href="mailto:info@hataykagit.com" data-cursor="link">info@hataykagit.com</a>
+      </div>
+    </div>
+    <div class="container footer__bar">
+      <span data-i18n-html="footer.copy">&copy; <b id="year"></b> Mozaik Ofset ve Ambalaj. Tüm hakları saklıdır.</span>
+      <span class="footer__legal">
+        <a href="privacy.html" data-i18n="footer.privacy" data-cursor="link">Gizlilik Politikası</a>
+        <span class="footer__dot">·</span>
+        <span data-i18n="footer.tag">Premium Baskı & Ambalaj</span>
+      </span>
+    </div>
+  </footer>
+
+  <!-- Quote request modal → opens WhatsApp with a ready message -->
+  <div class="modal" id="quoteModal" aria-hidden="true">
+    <div class="modal__backdrop" data-quote-close></div>
+    <div class="modal__box glass" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
+      <button class="modal__close" type="button" data-quote-close aria-label="Close">&times;</button>
+      <span class="kicker" data-i18n="quote.kicker">Get a Quote</span>
+      <h3 id="quoteTitle" class="modal__title" data-i18n="quote.title">Request a quote</h3>
+      <p class="modal__sub" data-i18n="quote.sub">Share a few details and we'll reply fast on WhatsApp.</p>
+      <form id="quoteForm" class="qform">
+        <div class="qform__row">
+          <label class="qform__field"><span data-i18n="quote.name">Name</span><input type="text" name="name" required /></label>
+          <label class="qform__field"><span data-i18n="quote.company">Company (optional)</span><input type="text" name="company" /></label>
+        </div>
+        <div class="qform__row">
+          <label class="qform__field"><span data-i18n="quote.phone">Phone (optional)</span><input type="text" name="phone" /></label>
+          <label class="qform__field"><span data-i18n="quote.ptype">Product type</span>
+            <select name="ptype">
+              <option data-i18n="quote.opt.folding">Folding carton</option>
+              <option data-i18n="quote.opt.corrugated">Corrugated box</option>
+              <option data-i18n="quote.opt.rigid">Rigid / telescope box</option>
+              <option data-i18n="quote.opt.window">Window box</option>
+              <option data-i18n="quote.opt.label">Label</option>
+              <option data-i18n="quote.opt.finish">Finishing (UV / foil)</option>
+              <option data-i18n="quote.opt.other">Other</option>
+            </select>
+          </label>
+        </div>
+        <div class="qform__row">
+          <label class="qform__field"><span data-i18n="quote.dims">Dimensions</span><input type="text" name="dims" placeholder="L × W × H" /></label>
+          <label class="qform__field"><span data-i18n="quote.qty">Quantity</span><input type="text" name="qty" inputmode="numeric" /></label>
+        </div>
+        <label class="qform__field"><span data-i18n="quote.notes">Notes</span><textarea name="notes" rows="3"></textarea></label>
+        <button type="submit" class="btn btn--cta btn--lg qform__send" data-cursor="cta" data-i18n="quote.send">Send on WhatsApp</button>
+      </form>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-  <script src="js/i18n.js?v=23"></script>
+  <script src="js/i18n.js?v=26"></script>
   <script src="js/main.js?v=27"></script>
-  <script>
-    /* Highlight the production step currently in the reading zone — text-only, no images. */
-    (function () {
-      var io = null;
-      function bind() {
-        if (io) io.disconnect();
-        var steps = [].slice.call(document.querySelectorAll(".timeline__flow .jstory")).filter(function (el) {
-          return el.querySelector(".jhead");
-        });
-        if (!steps.length) return;
-        io = new IntersectionObserver(function (entries) {
-          var best = null, bestRatio = 0;
-          entries.forEach(function (en) {
-            if (en.isIntersecting && en.intersectionRatio >= bestRatio) {
-              bestRatio = en.intersectionRatio; best = en.target;
-            }
-          });
-          if (!best) return;
-          steps.forEach(function (el) { el.classList.toggle("is-active", el === best); });
-        }, { rootMargin: "-28% 0px -48% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] });
-        steps.forEach(function (el) { io.observe(el); });
-      }
-      bind();
-      document.querySelectorAll("#lang [data-lang]").forEach(function (b) {
-        b.addEventListener("click", function () { setTimeout(bind, 60); });
-      });
-    })();
-  </script>
 </body>
 </html>
