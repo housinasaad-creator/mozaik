@@ -157,7 +157,12 @@ h1,h2,h3{ font-family:var(--font-head); font-weight:700; line-height:1.08; lette
 .glass{ background:linear-gradient(180deg,var(--surface-2),var(--surface)); border:1px solid var(--stroke); border-radius:var(--radius); backdrop-filter:blur(16px) saturate(1.1); -webkit-backdrop-filter:blur(16px) saturate(1.1); box-shadow:0 30px 70px -34px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.06); }
 
 /* Navbar */
-.nav{ position:fixed; top:0; inset-inline:0; z-index:50; padding:.9rem 0; transition:padding .3s,background .3s,border-color .3s; border-bottom:1px solid transparent; }
+/* z-index:100 + an always-on backdrop (not just .is-scrolled) so the header can never be
+   bled through by a popup/tooltip from lower in the page (e.g. a hovered cert preview whose
+   position lands near the top of the viewport) — the header must always render as the topmost,
+   fully opaque UI layer over any in-page content. */
+.nav{ position:fixed; top:0; inset-inline:0; z-index:100; padding:.9rem 0; transition:padding .3s,background .3s,border-color .3s; border-bottom:1px solid transparent;
+  background:rgba(10,10,12,.4); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
 .nav.is-scrolled{ padding:.45rem 0; background:rgba(10,10,12,.72); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-bottom:1px solid var(--stroke); }
 .nav__inner{ display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .brand{ display:flex; align-items:center; gap:.85rem; flex-shrink:0; }
@@ -805,6 +810,7 @@ html[lang="ar"] .infocard__k{ letter-spacing:.04em; }
    Drop it site-wide on small screens and use solid navy fills instead. */
 @media (max-width:820px){
   .glass{ background:linear-gradient(180deg,#152a52,#0f1f42); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .nav{ background:rgba(10,13,26,.82); backdrop-filter:none; -webkit-backdrop-filter:none; }
   .nav.is-scrolled{ background:#0a1330; backdrop-filter:none; -webkit-backdrop-filter:none; }
   .footer{ background:#0a1330; backdrop-filter:none; -webkit-backdrop-filter:none; }
   .nav__links,.lang__menu,.modal__backdrop{ backdrop-filter:none; -webkit-backdrop-filter:none; }
@@ -830,6 +836,7 @@ html.lite .reveal-shroud{ display:none; }                   /* mouse-tracking mo
 html.lite .aurora{ display:none; }                          /* blurred drifting blobs — off */
 /* backdrop-filter blur re-blurs every scroll frame — swap for solid navy fills */
 html.lite .glass{ background:linear-gradient(180deg,#152a52,#0f1f42); backdrop-filter:none; -webkit-backdrop-filter:none; }
+html.lite .nav{ background:rgba(10,13,26,.82); backdrop-filter:none; -webkit-backdrop-filter:none; }
 html.lite .nav.is-scrolled{ background:#0a1330; backdrop-filter:none; -webkit-backdrop-filter:none; }
 html.lite .footer{ background:#0a1330; backdrop-filter:none; -webkit-backdrop-filter:none; }
 html.lite .nav__links,

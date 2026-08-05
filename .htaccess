@@ -1,0 +1,25 @@
+# ============================================================
+# Mozaik Ofset ve Ambalaj — mozaikofset.com.tr
+# Force HTTPS + force the canonical "www" host (matches every
+# canonical/sitemap URL in this project, which all use www).
+# Drop this file into public_html on the real hosting account.
+# ============================================================
+
+RewriteEngine On
+
+# 1) Force www (mozaikofset.com.tr -> www.mozaikofset.com.tr)
+RewriteCond %{HTTP_HOST} ^mozaikofset\.com\.tr [NC]
+RewriteRule ^(.*)$ https://www.mozaikofset.com.tr/$1 [L,R=301]
+
+# 2) Force HTTPS (http -> https)
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/%{REQUEST_URI} [L,R=301]
+
+# ============================================================
+# Optional but recommended once SSL is active — uncomment to
+# tell browsers to always use HTTPS for this domain (HSTS).
+# Leave commented until you've confirmed HTTPS works everywhere.
+# ============================================================
+# <IfModule mod_headers.c>
+#   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# </IfModule>
