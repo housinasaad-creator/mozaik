@@ -433,6 +433,26 @@ html[dir="rtl"] .timeline__flow .jstory:has(.jhead){ padding:1.15rem calc(56px +
 .timeline__flow .jstory:has(.jhead).is-active{ background:rgba(255,255,255,.04); border-color:rgba(var(--accent-rgb),.4); box-shadow:0 18px 40px -28px rgba(0,0,0,.55); }
 .timeline__flow .jstory:has(.jhead).is-active::before{ transform:scale(1.08); box-shadow:0 0 0 1px rgba(var(--accent-rgb),.35),0 0 28px -4px rgba(var(--accent-rgb),.55); }
 .timeline__flow .jhead{ display:block; font-family:var(--font-head); font-weight:700; font-size:1.16rem; color:var(--accent-soft); margin-bottom:.35rem; }
+
+/* ===== Arabic bidi fix =====
+   The site keeps dir="ltr" for every language (fixed layout). In Arabic text that is
+   fine — until a Latin word/parenthesis (e.g. "(Grain Direction)", "Spot UV") is mixed
+   in: with an LTR base direction the Unicode bidi algorithm reorders the run and the
+   sentence becomes unreadable. unicode-bidi:plaintext makes each block resolve its OWN
+   base direction from its first strong character, so Arabic paragraphs read right-to-left
+   correctly with the English word sitting in place — while the page layout stays LTR and
+   Turkish/English (lang!=ar) are untouched. Applied to the mixed-content text blocks. */
+html[lang="ar"] .timeline__flow .jstory,
+html[lang="ar"] .timeline__flow .jhead,
+html[lang="ar"] .catalog-item__text h2,
+html[lang="ar"] .catalog-item__lead,
+html[lang="ar"] .pcard__titles h3,
+html[lang="ar"] .pcard__titles p,
+html[lang="ar"] .section-title,
+html[lang="ar"] .section-sub{ unicode-bidi:plaintext; }
+/* keep the numbered production steps right-aligned in Arabic (natural RTL reading) */
+html[lang="ar"] .timeline__flow .jstory:has(.jhead),
+html[lang="ar"] .timeline__flow .jstory:has(.jhead) .jhead{ text-align:right; }
 .prodline__back{ display:flex; flex-wrap:wrap; justify-content:center; gap:.75rem; margin-top:2.8rem; padding-bottom:calc(.5rem + env(safe-area-inset-bottom,0px)); }
 .prodline__back .btn{ min-height:44px; }
 @media (max-width:560px){
