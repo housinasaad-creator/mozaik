@@ -382,15 +382,15 @@
       const trayGroup = new THREE.Group();
 
       const whiteTex = plainPanel(1024, 1024, WHITE, 0.5);
-      const cyanTex = plainPanel(1024, 512, CYAN, 0.5);
+      const cyanTex = plainPanel(1024, 512, NAVY, 0.5); // was cyan — two-tone white/navy box, this texture covers the back wall + all thin trim edges
       const navyTex = plainPanel(1024, 512, NAVY, 0.5);
-      const frontTex = logoPanelTexture(1400, 380, CYAN, 0.26, false, 0, 0.81); // wide front wall: logo — subtitle line ("OFSET VE AMBALAJ") cropped off
+      const frontTex = logoPanelTexture(1400, 380, WHITE, 0.26, false, 0, 0.81); // was cyan — wide front wall: logo — subtitle line ("OFSET VE AMBALAJ") cropped off
       const pinkTexL = pinkEndTexture(1400, 440); // pink end: logo + shapes
       const pinkTexR = pinkEndTexture(1400, 440);
-      const lidTopTex = logoPanelTexture(1400, 900, CYAN, 0.34, false, 0); // colored logo on cyan lid top
+      const lidTopTex = logoPanelTexture(1400, 900, WHITE, 0.34, false, 0); // was cyan — logo on white lid top
       const lidInTex = plainPanel(1024, 1024, WHITE, 0.4);   // interior: plain white — no logo, no text
       const creaseInnerTex = creasedInnerTexture(1400, 300, BOX_W); // long-wall interior + corner glue creases
-      const tabLogoTex = plainPanel(1400, 300, CYAN, 0.4); // wide lock tab: plain cyan, no logo
+      const tabLogoTex = plainPanel(1400, 300, WHITE, 0.4); // was cyan — wide lock tab, plain white, no logo
       const pinkTabTex = pinkEndTexture(1400, 440); // short lock tabs: pink + shapes
 
       /* ---------- floor ---------- */

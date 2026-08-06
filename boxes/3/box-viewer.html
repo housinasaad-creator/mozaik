@@ -208,7 +208,7 @@
            · slider opens the box from the top: both flat panels
              swing apart and the gable triangles flop outward
          ========================================================= */
-      const BOX_W = 2.2, BOX_D = 1.6, BOX_H = 1.42, WALL_T = 0.0175, FLOOR_T = 0.02;
+      const BOX_W = 2.2, BOX_D = 1.6, BOX_H = 1.42, WALL_T = 0.0044, FLOOR_T = 0.005; // board thickness reduced to ~1/4 (was 0.0175 / 0.02) for a thinner, finer carton edge
       const FIN_H = 0.6;
       const HANDLE_LEN = 0.66, HANDLE_R = 0.105;
       const GABLE_INSET = 0;                // triangles start right AT the side-wall plane, like the real fold
@@ -371,7 +371,7 @@
       // (front and back), so when the box opens each handle face keeps its
       // own tab stuck to it from both sides
       function addLockTab(sign) {
-        const yEdge = FIN_H - 0.18 * Math.cos(GABLE_TILT);   // lowered along the slanted edge for realism
+        const yEdge = FIN_H - 0.11 * Math.cos(GABLE_TILT);   // sits a bit higher along the slanted edge (was 0.18)
         const x = sign * finHalfW(yEdge), y = WALL_T + yEdge;
         const mkDisc = (tex) => {
           const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, WALL_T * 1.6, 24), cardMat(tex));
@@ -401,7 +401,7 @@
         // die-cut interlock SLOT — a slim VERTICAL slot that starts right below the
         // apex and runs DOWN toward the round lock tab on the wide top lid, so the
         // tab tucks into it as the box shuts (real folding-carton overlap)
-        const sr = 0.035;                    // slot half-width (slim)
+        const sr = 0.0175;                   // slot half-width — halved (was 0.035); width only, height unchanged
         const yTop = GABLE_H - 0.045;        // starts just under the head
         const yBot = 0.50;                   // reaches down toward the lid lock circle (shorter slot)
         const cyT = yTop - sr, cyB = yBot + sr;

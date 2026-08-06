@@ -533,7 +533,7 @@ html[dir="rtl"] .timeline__flow .jstory:has(.jhead){ padding:1.15rem calc(56px +
 .media-tabs button:hover{ color:#fff; transform:translateY(-2px); }
 .media-tabs button.active{ color:#fff; border-color:transparent; background:linear-gradient(120deg,rgba(var(--accent-rgb),.22),rgba(var(--accent-rgb),.22)); box-shadow:var(--glow-cyan); }
 .media-stage{ position:relative; min-height:clamp(300px,42vw,480px); display:grid; place-items:center; border-radius:18px; overflow:hidden; border:1px solid var(--stroke); background:radial-gradient(120% 120% at 50% 0%,rgba(var(--accent-rgb),.08),rgba(var(--accent-rgb),.02) 60%,transparent 100%),var(--bg-2); transform-style:preserve-3d; filter:brightness(1.08); }
-.media-glow{ position:absolute; inset:16% 30%; border-radius:50%; background:radial-gradient(circle,rgba(var(--accent-rgb),.14),rgba(var(--accent2-rgb),.07) 50%,transparent 72%); filter:blur(24px); }
+.media-glow{ position:absolute; inset:-6% 4%; border-radius:50%; background:radial-gradient(circle,rgba(255,206,92,.34),rgba(230,176,64,.17) 50%,transparent 76%); filter:blur(34px); }
 .media-view{ position:absolute; inset:0; display:grid; place-items:center; overflow:hidden; background:radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb),.04) 0%, transparent 60%), #fff; }
 .media-view--3d{ overflow:hidden; }
 .media-view--pacdora{ background:#000; clip-path:inset(0 clamp(16px,10vw,140px) 0 clamp(16px,10vw,140px)); }
